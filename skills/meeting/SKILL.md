@@ -1,42 +1,57 @@
 ---
 name: meeting
-description: "ONLY use when the user EXPLICITLY asks for a meeting, discussion, design review, or multi-team collaboration. Do NOT use for simple build/create requests — those should be handled directly without a meeting. Trigger words: 'meeting', 'discuss', 'review together', 'get opinions from', 'design review', 'let the team discuss'."
+description: "Use for ANY user request that involves building, creating, designing, fixing, or modifying software. The orchestrator ALWAYS starts by convening a meeting first — no exceptions. Even simple requests go through: meeting → PRD minutes → plan review → user approval → compact → implement. This is the core open-coleslaw workflow."
 ---
 
-# Start a Meeting
+# The Open Coleslaw Workflow
 
-Use the `start-meeting` MCP tool to convene a multi-agent meeting.
+**Every request flows through this pipeline. No exceptions.**
 
-## IMPORTANT: When NOT to Use
+```
+User prompt → Meeting → PRD Minutes → Plan Review → User "OK" → Compact → Implement
+```
 
-Do NOT start a meeting when the user simply says:
-- "만들어줘" / "build this" / "create X" — just build it directly
-- "fix this bug" — just fix it
-- "add a feature" — just implement it
+The user just types what they want. You handle the rest.
 
-A meeting is ONLY appropriate when:
-- User explicitly says "회의해줘", "discuss", "let's review", "get team input"
-- The task requires trade-off analysis between multiple architectural approaches
-- There's genuine ambiguity that needs multiple perspectives
+## Step 1: Convene Meeting
 
-**When in doubt, just do the work. Don't hold a meeting for something you can build directly.**
+For ANY user request (build, create, fix, design, anything):
 
-## How to Use (when a meeting IS appropriate)
-
-1. Extract the **topic** from the user's request
-2. Break it into **agenda items** (2-4 specific discussion points)
-3. Call the `start-meeting` tool:
+1. Analyze the request and select relevant departments
+2. Create 2-4 agenda items
+3. Call `start-meeting`:
 
 ```
 start-meeting({
-  topic: "the topic",
-  agenda: ["agenda item 1", "agenda item 2", ...],
-  departments: ["architecture", "engineering"]  // optional, auto-selected if omitted
+  topic: "user's request summarized",
+  agenda: ["requirement analysis", "technical approach", "implementation plan", ...],
+  departments: ["architecture", "engineering", ...]
 })
 ```
 
-4. After the meeting completes, show the user the **meeting minutes** using `get-minutes`
-5. If the user wants to execute the decisions, use `compact-minutes` then `execute-tasks`
+## Step 2: Show PRD Minutes
+
+After the meeting completes:
+
+1. Call `get-minutes` with the meetingId
+2. Present the PRD meeting minutes to the user
+3. Highlight key **decisions** and **action items**
+
+## Step 3: Plan Review — Wait for User Approval
+
+**Do NOT proceed to implementation until the user says OK.**
+
+Present the plan and ask:
+- "Here are the meeting results and proposed plan. Shall I proceed with implementation?"
+- If user wants changes → refine the plan or call `chain-meeting` for follow-up
+- If user says OK → proceed to Step 4
+
+## Step 4: Compact and Implement
+
+1. Call `compact-minutes` to create structured tasks
+2. Call `execute-tasks` to deploy workers
+3. Call `get-task-report` for results
+4. Present the final output to the user
 
 ## Available Departments
 - `architecture` — system design, API, schema
