@@ -1,6 +1,6 @@
 {
   "name": "open-coleslaw",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Multi-agent orchestrator MCP plugin for Claude Code with hierarchical agent system",
   "type": "module",
   "bin": {

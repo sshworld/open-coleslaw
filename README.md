@@ -13,17 +13,19 @@ You type a prompt like *"Build me a balance game app"*. That's it.
 ```
 You: "Build me a balance game app"
 
-  → Orchestrator analyzes your request
+  → Orchestrator dispatched (Agent tool)
   → Convenes Architecture + Engineering + Product leaders
-  → Leaders hold a structured meeting (2-3 rounds per agenda item)
-  → PRD meeting minutes generated
-  → Plan presented to you for approval
-  → You: "OK"
-  → Tasks compacted → Workers hired → Code implemented
+  → Leaders hold a structured meeting
+  → PRD meeting minutes saved to docs/open-coleslaw/
+  → Plan Mode activated — you review the implementation plan
+  → You approve
+  → Implementer agents write the code
   → Results reported
 ```
 
-You never call a tool. You never pick a department. You never manage an agent. The orchestrator handles everything. If agents need your input on an important decision, they `@mention` you.
+You never call a tool. You never pick a department. You never manage an agent. The orchestrator handles everything — including entering **Plan Mode** so you can review the implementation plan in the native UI before any code is written.
+
+Meeting minutes are saved to `docs/open-coleslaw/` in your project, so you can always refer back to past decisions.
 
 ## Installation
 
@@ -51,18 +53,16 @@ You should see the orchestrator agent being dispatched and a meeting starting au
 Every request follows this flow. No exceptions.
 
 ```
-Prompt → Orchestrator → Meeting → PRD Minutes → Your Approval → Implement
+Prompt → Orchestrator → Meeting → Minutes → Plan Mode → Approve → Implement
 ```
 
 1. **Orchestrator dispatched** — analyzes your request, selects departments
-2. **Meeting convened** — leaders discuss in structured rounds
-3. **PRD minutes generated** — decisions, action items, technical specs
-4. **Plan presented** — you review and approve (or request changes)
-5. **Tasks compacted** — minutes converted to actionable tasks per department
-6. **Workers hired** — each leader deploys workers in parallel
+2. **Meeting convened** — leaders discuss via Agent tool
+3. **PRD minutes saved** — to `docs/open-coleslaw/` in your project
+4. **Plan Mode activated** — implementation plan presented in native Plan Mode UI
+5. **You review and approve** — or request changes (chains a follow-up meeting)
+6. **Implementer agents dispatched** — write code following the approved plan
 7. **Results reported** — final output delivered to you
-
-If you want changes mid-plan, the orchestrator chains a follow-up meeting.
 
 ## The Agent Hierarchy
 
@@ -75,11 +75,13 @@ If you want changes mid-plan, the orchestrator chains a follow-up meeting.
      ▼           ▼           ▼
 ┌─────────┐ ┌─────────┐ ┌─────────┐
 │  Arch   │ │  Eng    │ │  QA     │  ← Leaders meet & discuss
-│ Leader  │ │ Leader  │ │ Leader  │    Then hire their own workers
+│ Leader  │ │ Leader  │ │ Leader  │    Discuss via Agent tool
 └────┬────┘ └────┬────┘ └────┬────┘
-  ┌──┴──┐   ┌───┼───┐    ┌──┴──┐
-  │W1 W2│   │W3 W4 W5│   │W6   │    ← Workers execute in parallel
-  └─────┘   └───────┘    └─────┘
+     └───────────┼───────────┘
+                 ▼
+         ┌──────────────┐
+         │ Implementer  │  ← Writes code after plan approval
+         └──────────────┘
 ```
 
 **5 Departments**: Architecture, Engineering, QA, Product, Research
@@ -88,15 +90,17 @@ Each leader autonomously decides how many workers to hire based on task complexi
 
 ## What's Inside
 
-### 14 MCP Tools (orchestrator calls these — you never do)
+### 16 MCP Tools (orchestrator calls these — you never do)
 
 | Tool | What It Does |
 |------|-------------|
-| `start-meeting` | Convenes department leaders for a structured discussion |
+| `start-meeting` | Creates a meeting record, recommends departments |
+| `add-transcript` | Saves a leader's discussion input |
+| `generate-minutes` | Converts transcripts into PRD meeting minutes |
 | `get-meeting-status` | Checks meeting progress and agent states |
 | `get-minutes` | Retrieves PRD-format meeting minutes |
 | `compact-minutes` | Converts minutes into actionable tasks per department |
-| `execute-tasks` | Deploys workers to implement tasks in parallel |
+| `execute-tasks` | Returns structured task list for implementer agents |
 | `get-task-report` | Shows execution results per department |
 | `get-agent-tree` | Displays the full agent hierarchy |
 | `respond-to-mention` | Handles decisions the agents need from you |
@@ -106,6 +110,18 @@ Each leader autonomously decides how many workers to hire based on task complexi
 | `create-capability` | Self-extends the plugin with new hooks/skills |
 | `get-cost-summary` | Tracks spending per agent, meeting, department |
 | `chain-meeting` | Links meetings — output of one feeds into the next |
+
+### 7 Agents (dispatched via Agent tool)
+
+| Agent | Role |
+|-------|------|
+| `orchestrator` | Your proxy — manages the full pipeline |
+| `arch-leader` | System design, API contracts, schemas |
+| `eng-leader` | Implementation feasibility, code quality |
+| `qa-leader` | Testing strategy, security, edge cases |
+| `pm-leader` | Requirements, user stories, prioritization |
+| `research-leader` | Codebase exploration, prior art |
+| `implementer` | Writes code after plan approval |
 
 ### 7 Skills
 
