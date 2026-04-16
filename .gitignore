@@ -1,5 +1,5 @@
 node_modules/
-dist/
 *.tsbuildinfo
 .DS_Store
 .claude/
+# dist/ is committed because Claude Code plugins don't support build steps
