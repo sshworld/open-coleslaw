@@ -40,15 +40,15 @@ When the user asks you to build, create, fix, design, or modify anything:
    - `start-meeting`, `add-transcript`, `generate-minutes` for the meeting phase
    - `compact-minutes`, `get-task-report` for the execution phase
 
-4. **After the meeting, present results** to the user:
-   - Show the PRD meeting minutes
-   - Highlight key decisions and proposed plan
-   - Ask: "Shall I proceed with this plan?"
+4. **After the meeting, the orchestrator enters Plan Mode:**
+   - Saves meeting minutes to `docs/open-coleslaw/` in the project
+   - Uses EnterPlanMode to write the implementation plan
+   - Uses ExitPlanMode to present for your approval
 
-5. **Wait for user approval:**
-   - User approves → orchestrator dispatches `open-coleslaw:implementer` agents for each task
-   - User wants changes → orchestrator calls `chain-meeting` or adjusts
-   - User disagrees → drop the plan, ask what they want instead
+5. **You review the plan in Plan Mode UI:**
+   - Approve → orchestrator dispatches `open-coleslaw:implementer` agents
+   - Request changes → orchestrator adjusts or chains a follow-up meeting
+   - Reject → drop the plan
 
 ## Red Flags -- STOP
 
