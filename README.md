@@ -23,10 +23,10 @@ You get the final output. If agents need your input on an important decision, th
 
 ```bash
 # Add the marketplace
-claude plugin marketplace add sshworld/open-coleslaw
+/plugin marketplace add sshworld/open-coleslaw
 
 # Install the plugin
-claude plugin install open-coleslaw@sshworld
+/plugin install open-coleslaw@sshworld
 ```
 
 ### Verify Installation
