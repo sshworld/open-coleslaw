@@ -146,10 +146,11 @@ async function invokeReal(options: InvokeOptions): Promise<InvokeResult> {
     '--print',
     '--output-format', 'json',
     '--no-session-persistence',
+    '--bare',  // CRITICAL: skip hooks, plugins, MCP — prevents infinite recursion
   ];
 
   if (systemPrompt) {
-    args.push('--append-system-prompt', systemPrompt);
+    args.push('--system-prompt', systemPrompt);  // --bare requires full system prompt, not append
   }
 
   if (allowedTools.length > 0) {

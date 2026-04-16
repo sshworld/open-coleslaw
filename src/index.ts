@@ -7,12 +7,16 @@ import { startDashboard } from './dashboard/server.js';
 async function main() {
   ensureDataDirs();
 
-  // Start dashboard BEFORE MCP server (connect may block on stdio)
-  const sessionId = randomUUID();
-  const projectPath = process.cwd();
-  const projectName = projectPath.split('/').pop() ?? 'unknown';
+  // Only start dashboard if NOT running as a bare subprocess
+  // (bare mode = spawned by claude-invoker, should not start dashboard)
+  const isBareSubprocess = process.env['CLAUDE_CODE_SIMPLE'] === '1';
 
-  startDashboard({ sessionId, projectPath, projectName }).catch(() => {});
+  if (!isBareSubprocess) {
+    const sessionId = randomUUID();
+    const projectPath = process.cwd();
+    const projectName = projectPath.split('/').pop() ?? 'unknown';
+    startDashboard({ sessionId, projectPath, projectName }).catch(() => {});
+  }
 
   const server = createServer();
   const transport = new StdioServerTransport();
