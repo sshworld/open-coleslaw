@@ -2,97 +2,75 @@
 
 **Just type your prompt. Like coleslaw — it's already prepared, just scoop and eat.**
 
-Open Coleslaw is a multi-agent orchestrator plugin for Claude Code. It gives you an entire AI engineering team — architects, engineers, QA leads, product managers — that organizes itself, holds meetings, writes PRD-format minutes, and executes tasks. All you do is describe what you want.
+Open Coleslaw is a multi-agent orchestrator plugin for Claude Code. It gives you an entire AI engineering team — architects, engineers, QA leads, product managers — that organizes itself, holds meetings, writes PRD-format minutes, and executes tasks.
 
 Zero commands to memorize. Zero tools to call manually. Your AI team is already hired.
 
 ## How It Works
 
-You type a prompt like *"Design an authentication system for our API"*. That's it. Here's what happens behind the scenes:
+You type a prompt like *"Build me a balance game app"*. That's it.
 
-1. **The Orchestrator** (your proxy) analyzes your request and decides which department leaders are needed
-2. **Leaders convene a meeting** — Architecture, Engineering, QA discuss in structured rounds
-3. **PRD meeting minutes** are automatically generated with decisions, action items, and technical specs
-4. **Tasks are compacted** from minutes and assigned to departments
-5. **Workers are hired** by each leader to execute tasks in parallel
-6. **Results are reported** back through the hierarchy
+```
+You: "Build me a balance game app"
 
-You get the final output. If agents need your input on an important decision, they'll `@mention` you.
+  → Orchestrator analyzes your request
+  → Convenes Architecture + Engineering + Product leaders
+  → Leaders hold a structured meeting (2-3 rounds per agenda item)
+  → PRD meeting minutes generated
+  → Plan presented to you for approval
+  → You: "OK"
+  → Tasks compacted → Workers hired → Code implemented
+  → Results reported
+```
+
+You never call a tool. You never pick a department. You never manage an agent. The orchestrator handles everything. If agents need your input on an important decision, they `@mention` you.
 
 ## Installation
 
-```bash
-# Add the marketplace
-/plugin marketplace add sshworld/open-coleslaw
+In Claude Code:
 
-# Install the plugin
+```
+/plugin marketplace add sshworld/open-coleslaw
 /plugin install open-coleslaw@sshworld
 ```
 
-### Verify Installation
+Then start a new session. That's it — every prompt now goes through the orchestrator pipeline.
 
-Start a new Claude Code session and just type naturally:
+### Verify It Works
+
+Start a new session and type anything:
 
 ```
-Design a REST API for a todo app with user authentication
+Design a REST API for a todo app
 ```
 
-If Open Coleslaw is working, the orchestrator will automatically convene a meeting with the right leaders and start the discussion.
+You should see the orchestrator agent being dispatched and a meeting starting automatically.
 
-## What You Get
+## The Pipeline
 
-### 14 MCP Tools (all automatic — you never call these directly)
+Every request follows this flow. No exceptions.
 
-| Tool | What It Does |
-|------|-------------|
-| `start-meeting` | Convenes department leaders for a structured discussion |
-| `get-meeting-status` | Checks meeting progress and agent states |
-| `get-minutes` | Retrieves PRD-format meeting minutes |
-| `compact-minutes` | Converts minutes into actionable tasks per department |
-| `execute-tasks` | Deploys workers to implement tasks in parallel |
-| `get-task-report` | Shows execution results per department |
-| `get-agent-tree` | Displays the full agent hierarchy |
-| `respond-to-mention` | Handles decisions the agents need from you |
-| `get-mentions` | Lists pending `@mention` decision points |
-| `cancel-meeting` | Stops a meeting and cascades to all workers |
-| `list-meetings` | Shows meeting history |
-| `create-capability` | Self-extends the plugin with new hooks/skills |
-| `get-cost-summary` | Tracks spending per agent, meeting, department |
-| `chain-meeting` | Links meetings — output of one feeds into the next |
+```
+Prompt → Orchestrator → Meeting → PRD Minutes → Your Approval → Implement
+```
 
-### 6 Skills (AI decides when to use them)
+1. **Orchestrator dispatched** — analyzes your request, selects departments
+2. **Meeting convened** — leaders discuss in structured rounds
+3. **PRD minutes generated** — decisions, action items, technical specs
+4. **Plan presented** — you review and approve (or request changes)
+5. **Tasks compacted** — minutes converted to actionable tasks per department
+6. **Workers hired** — each leader deploys workers in parallel
+7. **Results reported** — final output delivered to you
 
-| Skill | Triggers When |
-|-------|--------------|
-| `meeting` | You ask to design, plan, discuss, or review something |
-| `status` | You ask about ongoing work or what agents are doing |
-| `dashboard` | You want to see the real-time visualization |
-| `mention` | There are pending decisions that need your input |
-| `agents` | You ask about the team hierarchy or who's working on what |
-| `minutes` | You want to read past meeting minutes or search decisions |
-
-### Real-Time Dashboard
-
-A cyberpunk-themed "Neon Ops Center" runs at `http://localhost:35143`:
-
-- Live agent hierarchy with animated connections
-- Meeting progress tracking
-- Task delegation and completion flow
-- `@mention` alerts
-- Cost tracking
-
-### Self-Extending
-
-If you ask for a workflow that doesn't exist yet, the orchestrator creates it — new hooks, skills, or automations — and registers them for future use.
+If you want changes mid-plan, the orchestrator chains a follow-up meeting.
 
 ## The Agent Hierarchy
 
 ```
         ┌─────────────────┐
         │   Orchestrator   │  ← Your proxy (NOT a CEO)
-        │  "What do you    │    Decides, but asks you
-        │   need built?"   │    for important calls
-        └────────┬────────┘
+        │   (claude-opus)  │    Decides, but asks you
+        └────────┬────────┘    for important calls
      ┌───────────┼───────────┐
      ▼           ▼           ▼
 ┌─────────┐ ┌─────────┐ ┌─────────┐
@@ -107,6 +85,54 @@ If you ask for a workflow that doesn't exist yet, the orchestrator creates it �
 **5 Departments**: Architecture, Engineering, QA, Product, Research
 
 Each leader autonomously decides how many workers to hire based on task complexity.
+
+## What's Inside
+
+### 14 MCP Tools (orchestrator calls these — you never do)
+
+| Tool | What It Does |
+|------|-------------|
+| `start-meeting` | Convenes department leaders for a structured discussion |
+| `get-meeting-status` | Checks meeting progress and agent states |
+| `get-minutes` | Retrieves PRD-format meeting minutes |
+| `compact-minutes` | Converts minutes into actionable tasks per department |
+| `execute-tasks` | Deploys workers to implement tasks in parallel |
+| `get-task-report` | Shows execution results per department |
+| `get-agent-tree` | Displays the full agent hierarchy |
+| `respond-to-mention` | Handles decisions the agents need from you |
+| `get-mentions` | Lists pending @mention decision points |
+| `cancel-meeting` | Stops a meeting and cascades to all workers |
+| `list-meetings` | Shows meeting history |
+| `create-capability` | Self-extends the plugin with new hooks/skills |
+| `get-cost-summary` | Tracks spending per agent, meeting, department |
+| `chain-meeting` | Links meetings — output of one feeds into the next |
+
+### 7 Skills
+
+| Skill | Purpose |
+|-------|---------|
+| `using-open-coleslaw` | Loaded at session start — ensures all requests go through the pipeline |
+| `meeting` | Dispatches the orchestrator for the meeting → plan → implement flow |
+| `status` | Shows active meetings, agents, pending mentions |
+| `dashboard` | Opens the real-time Neon Ops Center |
+| `mention` | Handles pending @mention decisions |
+| `agents` | Shows the agent hierarchy tree |
+| `minutes` | Browses past meeting minutes |
+
+### Real-Time Dashboard
+
+A cyberpunk-themed "Neon Ops Center" at `http://localhost:35143`:
+
+- Live agent hierarchy with animated connections
+- Per-project tabs (multiple terminals → multiple tabs)
+- Meeting progress tracking
+- Task delegation and completion flow
+- @mention alerts
+- Duplicate project names get auto-numbered: `project`, `project (1)`
+
+### Self-Extending
+
+Ask for a workflow that doesn't exist yet, and the orchestrator creates it — new hooks, skills, or automations — registered for future use.
 
 ## Agent Tiers
 
@@ -125,10 +151,11 @@ Coleslaw is a side dish that's already made. You don't prepare it — you just e
 
 ### Key Decisions
 
-- **The Orchestrator is your proxy, not a CEO.** You are the decision-maker. The orchestrator acts on your behalf but escalates important choices via `@mention`.
+- **The Orchestrator is your proxy, not a CEO.** You are the decision-maker. The orchestrator acts on your behalf but escalates important choices via @mention.
+- **Meeting first, always.** Even "simple" requests go through the pipeline. If it's truly simple, the meeting will be fast.
 - **MVP cycles.** Work happens in loops: meeting → develop → verify → (re-meet if needed).
-- **Rules survive context compaction.** Core rules are injected every session via hooks, embedded in agent prompts, and stored in persistent files. The system never forgets how to behave.
-- **Agents check before they code.** Every agent analyzes the project's dependencies, existing code, and conventions before writing anything. No duplicate packages, no style violations.
+- **Rules survive context compaction.** The `using-open-coleslaw` skill is injected at every session start. The system never forgets how to behave.
+- **Agents check before they code.** Every agent analyzes the project's dependencies, existing code, and conventions before writing anything.
 
 ## Development
 
@@ -141,7 +168,7 @@ npm run build
 # Run with mock agents (no Claude CLI needed)
 COLESLAW_MOCK=1 node dist/index.js
 
-# Run tests
+# Run tests (218 tests)
 npm test
 
 # Type check

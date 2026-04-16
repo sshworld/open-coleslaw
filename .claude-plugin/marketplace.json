@@ -8,7 +8,7 @@
     {
       "name": "open-coleslaw",
       "description": "Multi-agent orchestrator for Claude Code. Like coleslaw — just scoop and eat.",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "source": "./"
     }
   ]
