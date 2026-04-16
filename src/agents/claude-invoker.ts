@@ -145,28 +145,35 @@ async function invokeReal(options: InvokeOptions): Promise<InvokeResult> {
   const args: string[] = [
     '--print',
     '--output-format', 'json',
-    '--system-prompt', systemPrompt,
     '--no-session-persistence',
   ];
+
+  if (systemPrompt) {
+    args.push('--append-system-prompt', systemPrompt);
+  }
 
   if (allowedTools.length > 0) {
     args.push('--allowedTools', allowedTools.join(','));
   }
 
-  // The prompt is the final positional argument
-  args.push(prompt);
+  // Prompt via stdin (avoids ARG_MAX issues with long prompts)
+  // Do NOT add prompt as positional arg
 
   logger.info('Invoking Claude CLI', {
-    maxTurns: maxTurns as unknown as string,
+    promptLength: prompt.length as unknown as string,
     toolCount: allowedTools.length as unknown as string,
   });
 
   return new Promise<InvokeResult>((resolve) => {
     const child = spawn('claude', args, {
       cwd: cwd ?? process.cwd(),
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env },
     });
+
+    // Send prompt via stdin
+    child.stdin.write(prompt);
+    child.stdin.end();
 
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
