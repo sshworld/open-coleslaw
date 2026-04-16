@@ -6,16 +6,17 @@ import { startDashboard } from './dashboard/server.js';
 
 async function main() {
   ensureDataDirs();
-  const server = createServer();
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
 
-  // Start dashboard alongside MCP server
+  // Start dashboard BEFORE MCP server (connect may block on stdio)
   const sessionId = randomUUID();
   const projectPath = process.cwd();
   const projectName = projectPath.split('/').pop() ?? 'unknown';
 
-  await startDashboard({ sessionId, projectPath, projectName });
+  startDashboard({ sessionId, projectPath, projectName }).catch(() => {});
+
+  const server = createServer();
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
 }
 
 main().catch((error) => {
