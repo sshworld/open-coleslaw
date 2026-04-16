@@ -7,7 +7,22 @@ set -euo pipefail
 RULES_FILE="${CLAUDE_PLUGIN_ROOT}/src/assets/rules.md"
 GUIDE_FILE="${CLAUDE_PLUGIN_ROOT}/src/assets/plugin-guide.md"
 
-CONTENT=""
+CONTENT="<EXTREMELY_IMPORTANT>
+You have the open-coleslaw plugin installed.
+
+For ANY user request involving building, creating, designing, fixing, or modifying software — you MUST use the open-coleslaw:meeting skill FIRST. No exceptions.
+
+The workflow is ALWAYS:
+1. Invoke Skill tool with 'open-coleslaw:meeting'
+2. Follow the meeting → PRD → plan review → user approval → implement pipeline
+3. Never skip the meeting step. Never build directly without going through open-coleslaw.
+
+If you think 'this is simple enough to just do directly' — STOP. That thought means you are skipping the workflow. Use open-coleslaw:meeting.
+
+The user installed this plugin specifically so that ALL work goes through the structured meeting pipeline. Respect their choice.
+</EXTREMELY_IMPORTANT>
+
+"
 
 if [ -f "$RULES_FILE" ]; then
   CONTENT="${CONTENT}$(cat "$RULES_FILE")"
