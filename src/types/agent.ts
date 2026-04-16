@@ -67,9 +67,9 @@ export interface AgentConfig {
 
 export const TIER_CONFIGS: Record<AgentTier, Omit<AgentConfig, 'allowedTools'>> = {
   orchestrator: {
-    model: 'claude-sonnet-4-6',
+    model: 'claude-opus-4-6',
     maxTurns: 10,
-    maxBudgetUsd: 1.0,
+    maxBudgetUsd: 5.0,
   },
   leader: {
     model: 'claude-sonnet-4-6',

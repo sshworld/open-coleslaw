@@ -21,12 +21,12 @@ Orchestrator (proxy) → Part Leaders (team leads) → Workers (executors)
 - `mvp-cycle` — Triggers re-meeting on verification failure
 
 ## Agent Tiers
-| Tier | Model | Max Turns | Max Budget |
-|------|-------|-----------|------------|
-| Orchestrator | claude-sonnet-4-6 | 10 | $1.00 |
-| Leader | claude-sonnet-4-6 | 20 | $2.00 |
-| Worker (impl) | claude-sonnet-4-6 | 30 | $0.50 |
-| Worker (research) | claude-haiku-4-5 | 10 | $0.10 |
+| Tier | Model | Role |
+|------|-------|------|
+| Orchestrator | claude-opus-4-6 (1M) | Full-picture routing, delegation |
+| Leader | claude-sonnet-4-6 | Meetings, technical decisions |
+| Worker (impl) | claude-sonnet-4-6 | Code, implementation |
+| Worker (research) | claude-haiku-4-5 | Quick lookups |
 
 ## Departments
 - Architecture: system design, API, schema

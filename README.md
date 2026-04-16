@@ -108,14 +108,14 @@ If you ask for a workflow that doesn't exist yet, the orchestrator creates it â€
 
 Each leader autonomously decides how many workers to hire based on task complexity.
 
-## Agent Tiers & Cost
+## Agent Tiers
 
-| Tier | Model | Max Budget | Role |
-|------|-------|-----------|------|
-| Orchestrator | claude-sonnet-4-6 | $1.00 | Routing, delegation |
-| Leader | claude-sonnet-4-6 | $2.00 | Meetings, decisions |
-| Worker | claude-sonnet-4-6 | $0.50 | Code, implementation |
-| Research Worker | claude-haiku-4-5 | $0.10 | Quick lookups |
+| Tier | Model | Role |
+|------|-------|------|
+| Orchestrator | claude-opus-4-6 (1M) | Full-picture routing, delegation, judgment |
+| Leader | claude-sonnet-4-6 | Meetings, technical decisions |
+| Worker | claude-sonnet-4-6 | Code, implementation |
+| Research Worker | claude-haiku-4-5 | Quick lookups, exploration |
 
 ## Philosophy
 

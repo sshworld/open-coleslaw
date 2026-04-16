@@ -7,8 +7,8 @@
   "locals": [
     {
       "type": "stdio",
-      "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/index.js"]
+      "command": "bash",
+      "args": ["-c", "cd \"${CLAUDE_PLUGIN_ROOT}\" && [ -f dist/index.js ] || npm run build && node dist/index.js"]
     }
   ]
 }

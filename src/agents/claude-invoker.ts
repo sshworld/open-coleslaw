@@ -148,16 +148,11 @@ async function invokeReal(options: InvokeOptions): Promise<InvokeResult> {
     '--print',
     '--output-format', 'json',
     '--system-prompt', systemPrompt,
-    '--max-turns', String(maxTurns),
     '--no-session-persistence',
   ];
 
   if (allowedTools.length > 0) {
     args.push('--allowedTools', allowedTools.join(','));
-  }
-
-  if (maxBudgetUsd !== undefined) {
-    args.push('--max-budget', String(maxBudgetUsd));
   }
 
   // The prompt is the final positional argument
