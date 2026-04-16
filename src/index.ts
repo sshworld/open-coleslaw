@@ -7,8 +7,7 @@ import { startDashboard } from './dashboard/server.js';
 async function main() {
   ensureDataDirs();
 
-  // Only start dashboard if NOT running as a bare subprocess
-  // (bare mode = spawned by claude-invoker, should not start dashboard)
+  // Only start dashboard if not explicitly disabled
   const isBareSubprocess = process.env['CLAUDE_CODE_SIMPLE'] === '1';
 
   if (!isBareSubprocess) {

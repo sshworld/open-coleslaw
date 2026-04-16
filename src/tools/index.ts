@@ -12,3 +12,5 @@ export { getTaskReportSchema, getTaskReportHandler } from './get-task-report.js'
 export { createCapabilitySchema, createCapabilityHandler } from './create-capability.js';
 export { getCostSummarySchema, getCostSummaryHandler } from './get-cost-summary.js';
 export { chainMeetingSchema, chainMeetingHandler } from './chain-meeting.js';
+export { addTranscriptSchema, addTranscriptHandler } from './add-transcript.js';
+export { generateMinutesSchema, generateMinutesHandler } from './generate-minutes.js';

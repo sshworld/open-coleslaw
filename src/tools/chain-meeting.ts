@@ -25,21 +25,12 @@ export async function chainMeetingHandler({
 }): Promise<{ content: { type: 'text'; text: string }[]; isError?: boolean }> {
   try {
     const orchestrator = new Orchestrator();
-    const meetingId = await orchestrator.chainMeeting({
+    const result = orchestrator.chainMeeting({
       previousMeetingId,
       topic,
       agenda,
       departments: departments as Department[] | undefined,
     });
-
-    const result = {
-      meetingId,
-      status: 'started',
-      chainedFrom: previousMeetingId,
-      topic,
-      agenda,
-      departments: departments ?? orchestrator.selectLeaders(topic, agenda),
-    };
 
     return {
       content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],

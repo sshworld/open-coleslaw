@@ -3,9 +3,9 @@ name: using-open-coleslaw
 description: "Loaded automatically at session start. Establishes that ALL software tasks must go through the open-coleslaw orchestrator pipeline: meeting → PRD → plan review → user approval → implement. Never skip this."
 ---
 
-# 🥬 You have Open Coleslaw.
+# You have Open Coleslaw.
 
-Like coleslaw — it's already prepared. The user just types what they want. You handle the rest through the orchestrator.
+Like coleslaw -- it's already prepared. The user just types what they want. You handle the rest through the orchestrator.
 
 <HARD-GATE>
 Do NOT write code, create files, run commands, or take ANY implementation action without first going through the open-coleslaw pipeline. This applies to EVERY request regardless of perceived simplicity.
@@ -21,7 +21,7 @@ No exceptions. Not for "simple" tasks. Not for "quick fixes." Not for anything.
 
 When the user asks you to build, create, fix, design, or modify anything:
 
-1. **Dispatch the orchestrator agent:**
+1. **Dispatch the orchestrator agent** using the Agent tool:
    ```
    Agent({
      subagent_type: "open-coleslaw:orchestrator",
@@ -29,31 +29,30 @@ When the user asks you to build, create, fix, design, or modify anything:
    })
    ```
 
-2. **The orchestrator will:**
-   - Analyze the project (dependencies, existing code, conventions)
-   - Select the right department leaders (architecture, engineering, qa, product, research)
-   - Convene a structured meeting
-   - Generate PRD-format meeting minutes with decisions and action items
+2. **The orchestrator dispatches leader agents** as needed:
+   - `open-coleslaw:arch-leader` -- system design, API contracts, schemas
+   - `open-coleslaw:eng-leader` -- implementation feasibility, code quality, tech debt
+   - `open-coleslaw:qa-leader` -- testing strategy, security, edge cases
+   - `open-coleslaw:pm-leader` -- requirements clarity, user stories, acceptance criteria
+   - `open-coleslaw:research-leader` -- codebase exploration, prior art, feasibility
 
-3. **Present the results** to the user:
+3. **The orchestrator uses MCP tools** for meeting management:
+   - `start-meeting`, `add-transcript`, `generate-minutes` for the meeting phase
+   - `compact-minutes`, `get-task-report` for the execution phase
+
+4. **After the meeting, present results** to the user:
    - Show the PRD meeting minutes
    - Highlight key decisions and proposed plan
    - Ask: "Shall I proceed with this plan?"
 
-4. **Wait for user approval:**
-   - User says OK → compact minutes into tasks → execute with workers
-   - User wants changes → chain a follow-up meeting or adjust the plan
+5. **Wait for user approval:**
+   - User approves → orchestrator dispatches `open-coleslaw:implementer` agents for each task
+   - User wants changes → orchestrator calls `chain-meeting` or adjusts
    - User disagrees → drop the plan, ask what they want instead
 
-5. **After approval, implement:**
-   - Use `compact-minutes` to create structured tasks
-   - Use `execute-tasks` to deploy workers
-   - Use `get-task-report` for results
-   - Present output to user
+## Red Flags -- STOP
 
-## Red Flags — STOP
-
-These thoughts mean you're about to skip the pipeline:
+These thoughts mean you are about to skip the pipeline:
 
 | Thought | Reality |
 |---------|---------|
@@ -64,17 +63,23 @@ These thoughts mean you're about to skip the pipeline:
 | "The user seems in a hurry" | Fast meetings are still meetings. Don't skip. |
 | "I already know the answer" | The team might disagree. Get their input. |
 
-## What the Orchestrator Decides
+## Agent Dispatch Pattern
 
-The orchestrator is the user's proxy. It autonomously:
-- Picks which departments attend the meeting
-- Sets the agenda
-- Runs the discussion rounds
-- Generates minutes
-- Surfaces @mentions for decisions that need the user
+All work flows through the Agent tool. The hierarchy:
 
-You never need to make these decisions. Just dispatch the orchestrator.
+```
+You (Claude Code)
+  └── Agent: open-coleslaw:orchestrator
+        ├── Agent: open-coleslaw:arch-leader
+        ├── Agent: open-coleslaw:eng-leader
+        ├── Agent: open-coleslaw:qa-leader
+        ├── Agent: open-coleslaw:pm-leader
+        ├── Agent: open-coleslaw:research-leader
+        └── Agent: open-coleslaw:implementer (after approval)
+```
+
+You only dispatch the orchestrator. The orchestrator dispatches everything else.
 
 ## Dashboard
 
-The real-time dashboard runs at **http://localhost:35143** — remind the user occasionally.
+The real-time dashboard runs at **http://localhost:35143** -- remind the user occasionally.

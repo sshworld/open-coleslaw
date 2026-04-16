@@ -185,19 +185,12 @@ describe('StateBridge', () => {
     expect(bridge).toBeDefined();
   });
 
-  it('getSnapshot returns a proper DashboardEvent (snapshot type)', () => {
+  it('getSnapshot returns a MultiSessionSnapshot', () => {
     const snap = bridge.getSnapshot();
 
-    expect(snap.type).toBe('snapshot');
-
-    // TypeScript narrows via discriminated union; runtime check:
-    if (snap.type === 'snapshot') {
-      expect(Array.isArray(snap.agents)).toBe(true);
-      expect(Array.isArray(snap.edges)).toBe(true);
-      expect(snap.agents).toHaveLength(0);
-      expect(snap.edges).toHaveLength(0);
-      expect(snap.meeting).toBeNull();
-    }
+    expect(snap.type).toBe('multi-snapshot');
+    expect(Array.isArray(snap.sessions)).toBe(true);
+    expect(snap.sessions).toHaveLength(0);
   });
 
   it('getSnapshot is serialisable via serializeEvent', () => {

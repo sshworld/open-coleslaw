@@ -1,17 +1,13 @@
 /**
- * End-to-end integration test for the full meeting flow.
+ * End-to-end integration test for the new architecture.
  *
- * Exercises: Orchestrator -> LeaderPool -> MeetingRunner -> minutes generation
- *           -> Compactor, all backed by an in-memory SQLite DB and mock agent
- *           responses (COLESLAW_MOCK=1).
+ * New flow: Orchestrator creates meeting (sync) → transcripts added via MCP tool
+ * → minutes generated → compacted → tasks returned.
+ * No subprocess spawning. Agent dispatch is external (Claude Code Agent tool).
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestDb } from '../fixtures/test-db.js';
-
-// ---------------------------------------------------------------------------
-// DB mock — must come before any storage import
-// ---------------------------------------------------------------------------
 
 vi.mock('../../src/storage/db.js', () => {
   let db: any = null;
@@ -21,141 +17,99 @@ vi.mock('../../src/storage/db.js', () => {
       return db;
     },
     closeDb: () => {
-      if (db) {
-        db.close();
-        db = null;
-      }
+      if (db) { db.close(); db = null; }
     },
-    __setTestDb: (testDb: any) => {
-      db = testDb;
-    },
+    __setTestDb: (testDb: any) => { db = testDb; },
   };
 });
 
 const dbMock = (await import('../../src/storage/db.js')) as any;
 
-// ---------------------------------------------------------------------------
-// Imports under test
-// ---------------------------------------------------------------------------
-
 const { Orchestrator } = await import('../../src/orchestrator/orchestrator.js');
+const { MeetingRunner } = await import('../../src/orchestrator/meeting-runner.js');
 const { Compactor } = await import('../../src/meeting/compactor.js');
-const { getMeeting, listMeetings, listAgentsByMeeting, getMinutesByMeeting } = await import(
+const { getMeeting, listMeetings, getMinutesByMeeting } = await import(
   '../../src/storage/index.js'
 );
 
-// ---------------------------------------------------------------------------
-// Setup / Teardown
-// ---------------------------------------------------------------------------
-
 beforeEach(() => {
-  process.env.COLESLAW_MOCK = '1';
   dbMock.__setTestDb(createTestDb());
 });
 
 afterEach(() => {
   dbMock.closeDb();
-  delete process.env.COLESLAW_MOCK;
 });
 
-// ---------------------------------------------------------------------------
-// Full flow test
-// ---------------------------------------------------------------------------
+describe('E2E: meeting data flow', () => {
+  it('creates meeting, adds transcripts, generates minutes, compacts', async () => {
+    const orchestrator = new Orchestrator();
 
-describe('E2E: full meeting flow', () => {
-  it(
-    'runs a complete meeting through orchestrator and generates minutes',
-    async () => {
-      const orchestrator = new Orchestrator();
+    // 1. Start meeting (sync — just creates record)
+    const result = orchestrator.startMeeting({
+      topic: 'API Design',
+      agenda: ['REST vs GraphQL', 'Auth method'],
+    });
 
-      // Start a meeting — this runs the full pipeline: convening -> opening
-      // -> discussion -> synthesis -> minutes-generation -> completed.
-      const meetingId = await orchestrator.startMeeting({
-        topic: 'API Design',
-        agenda: ['REST vs GraphQL', 'Auth method'],
-      });
+    expect(result.meetingId).toBeTruthy();
+    expect(result.departments.length).toBeGreaterThanOrEqual(1);
+    expect(result.agenda).toHaveLength(2);
 
-      // 1. Meeting was created and completed.
-      expect(meetingId).toBeTruthy();
+    const meeting = getMeeting(result.meetingId);
+    expect(meeting).not.toBeNull();
+    expect(meeting!.topic).toBe('API Design');
+    expect(meeting!.status).toBe('pending');
 
-      const meeting = getMeeting(meetingId);
-      expect(meeting).not.toBeNull();
-      expect(meeting!.topic).toBe('API Design');
-      expect(meeting!.status).toBe('completed');
-      expect(meeting!.completedAt).toBeGreaterThan(0);
+    // 2. Add transcripts (simulating leader agent responses via MCP tool)
+    const runner = new MeetingRunner(result.meetingId);
 
-      // 2. Leaders (agents) were spawned.
-      const agents = listAgentsByMeeting(meetingId);
-      expect(agents.length).toBeGreaterThanOrEqual(1);
+    runner.addTranscript('arch-leader', 0, 1,
+      'From an architecture perspective, REST is simpler but GraphQL gives more flexibility. I recommend REST for MVP.');
+    runner.addTranscript('eng-leader', 0, 1,
+      'Agreed on REST for MVP. We should implement OpenAPI spec for documentation.');
+    runner.addTranscript('arch-leader', 1, 1,
+      'For auth, JWT with refresh tokens is the standard approach. We need to decide on session storage.');
+    runner.addTranscript('eng-leader', 1, 1,
+      'JWT sounds good. Redis for session storage. Must implement rate limiting.');
 
-      // All leaders should be completed (deactivated after meeting).
-      for (const agent of agents) {
-        expect(agent.tier).toBe('leader');
-        expect(agent.status).toBe('completed');
-      }
+    // 3. Generate minutes
+    const minutesId = await runner.generateMinutes();
+    expect(minutesId).toBeTruthy();
 
-      // 3. Transcript entries exist.
-      const db = dbMock.getDb();
-      const transcriptRows = db
-        .prepare('SELECT * FROM transcript_entries WHERE meeting_id = ?')
-        .all(meetingId);
-      expect(transcriptRows.length).toBeGreaterThan(0);
+    const minutes = getMinutesByMeeting(result.meetingId);
+    expect(minutes).not.toBeNull();
+    expect(minutes!.content).toContain('Meeting Minutes');
+    expect(minutes!.content).toContain('API Design');
 
-      // 4. Minutes were generated.
-      const minutes = getMinutesByMeeting(meetingId);
-      expect(minutes).not.toBeNull();
-      expect(minutes!.content).toContain('Meeting Minutes');
-      expect(minutes!.content).toContain('API Design');
-      expect(minutes!.actionItems.length).toBeGreaterThanOrEqual(1);
+    // 4. Compact minutes into tasks
+    const compactor = new Compactor();
+    const actionItems = await compactor.compactMinutes(result.meetingId);
+    expect(actionItems.length).toBeGreaterThanOrEqual(1);
 
-      // 5. Compact the minutes.
-      const compactor = new Compactor();
-      const actionItems = await compactor.compactMinutes(meetingId);
+    for (const item of actionItems) {
+      expect(item).toHaveProperty('id');
+      expect(item).toHaveProperty('title');
+      expect(item).toHaveProperty('assignedDepartment');
+      expect(item).toHaveProperty('priority');
+    }
 
-      expect(actionItems.length).toBeGreaterThanOrEqual(1);
-      for (const item of actionItems) {
-        expect(item).toHaveProperty('id');
-        expect(item).toHaveProperty('title');
-        expect(item).toHaveProperty('assignedDepartment');
-        expect(item).toHaveProperty('priority');
-      }
-
-      // 6. Cost summary (via Orchestrator.getStatus).
-      const status = orchestrator.getStatus();
-      // The meeting we just ran should not be active anymore.
-      expect(
-        status.activeMeetings.some((m) => m.id === meetingId),
-      ).toBe(false);
-
-      // 7. Meeting shows up in listMeetings.
-      const all = listMeetings();
-      expect(all.some((m) => m.id === meetingId)).toBe(true);
-    },
-    30_000, // allow up to 30 seconds for mock meeting flow
-  );
+    // 5. Meeting shows up in list
+    const all = listMeetings();
+    expect(all.some((m) => m.id === result.meetingId)).toBe(true);
+  });
 
   it('selectLeaders picks departments based on keywords', () => {
     const orchestrator = new Orchestrator();
-
-    // Topic with engineering + architecture keywords
     const depts = orchestrator.selectLeaders('Build REST API endpoint', [
       'implement user CRUD',
       'design data schema',
     ]);
-
     expect(depts).toContain('engineering');
-    // "schema" and "design" should trigger architecture
     expect(depts).toContain('architecture');
   });
 
   it('selectLeaders falls back to engineering for unknown topics', () => {
     const orchestrator = new Orchestrator();
-
-    const depts = orchestrator.selectLeaders('Something very generic', [
-      'Do something',
-    ]);
-
-    // Fallback for simple topics (< 3 agenda items) is engineering only.
+    const depts = orchestrator.selectLeaders('Something very generic', ['Do something']);
     expect(depts).toContain('engineering');
   });
 });

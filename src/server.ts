@@ -27,6 +27,10 @@ import {
   getCostSummaryHandler,
   chainMeetingSchema,
   chainMeetingHandler,
+  addTranscriptSchema,
+  addTranscriptHandler,
+  generateMinutesSchema,
+  generateMinutesHandler,
 } from './tools/index.js';
 
 export function createServer(): McpServer {
@@ -38,7 +42,7 @@ export function createServer(): McpServer {
   // 1. start-meeting
   server.tool(
     'start-meeting',
-    'Start a new multi-agent meeting on a topic with agenda items',
+    'Create a new meeting record with topic and agenda. Returns meetingId and recommended departments. Does NOT run the meeting.',
     startMeetingSchema,
     startMeetingHandler,
   );
@@ -70,7 +74,7 @@ export function createServer(): McpServer {
   // 5. execute-tasks
   server.tool(
     'execute-tasks',
-    'Execute tasks from compacted minutes by spawning workers per department',
+    'Get the task list from compacted minutes for agent dispatch. Does NOT spawn workers.',
     executeTasksSchema,
     executeTasksHandler,
   );
@@ -141,9 +145,25 @@ export function createServer(): McpServer {
   // 14. chain-meeting
   server.tool(
     'chain-meeting',
-    'Start a new meeting chained from a previous meeting, using its minutes as context',
+    'Create a new meeting chained from a previous meeting, using its minutes as context. Does NOT run the meeting.',
     chainMeetingSchema,
     chainMeetingHandler,
+  );
+
+  // 15. add-transcript
+  server.tool(
+    'add-transcript',
+    'Add a transcript entry to a meeting. Used to record speaker contributions during meeting phases.',
+    addTranscriptSchema,
+    addTranscriptHandler,
+  );
+
+  // 16. generate-minutes
+  server.tool(
+    'generate-minutes',
+    'Generate PRD minutes from all stored transcripts for a meeting. Marks the meeting as completed.',
+    generateMinutesSchema,
+    generateMinutesHandler,
   );
 
   return server;

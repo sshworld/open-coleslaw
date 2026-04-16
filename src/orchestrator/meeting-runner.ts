@@ -1,67 +1,17 @@
 import type {
-  AgentNode,
-  Department,
   TranscriptEntry,
   MeetingStatus,
   MeetingPhase,
-  MinutesRecord,
   ActionItem,
 } from '../types/index.js';
-import { DEFAULT_MEETING_CONFIG } from '../types/index.js';
 import {
   getMeeting,
   updateMeeting,
   createMinutes,
+  getMinutesByMeeting,
 } from '../storage/index.js';
 import { getDb } from '../storage/db.js';
-import { getLeaderSystemPrompt } from '../agents/leader-prompts.js';
-import { createAgentConfig } from '../agents/agent-factory.js';
-import { invokeClaude, buildInvokeOptions } from '../agents/claude-invoker.js';
-import { eventBus } from './event-bus.js';
 import { logger } from '../utils/logger.js';
-
-// ---------------------------------------------------------------------------
-// Agent query — uses Claude CLI or falls back to mock
-// ---------------------------------------------------------------------------
-
-interface AgentQueryConfig {
-  role: string;
-  department: Department;
-  systemPrompt: string;
-}
-
-/**
- * Query a Claude agent via the CLI subprocess invoker.
- *
- * When COLESLAW_MOCK=1 is set or the `claude` CLI is not available, this
- * automatically falls back to mock responses inside `invokeClaude`.
- */
-async function queryAgent(config: AgentQueryConfig, prompt: string): Promise<string> {
-  const agentConfig = createAgentConfig({
-    tier: 'leader',
-    role: config.role,
-    department: config.department,
-  });
-
-  const invokeOpts = buildInvokeOptions(
-    agentConfig,
-    prompt,
-    config.systemPrompt,
-  );
-
-  // Leaders get a 10-minute timeout
-  invokeOpts.timeoutMs = 600_000;
-
-  const result = await invokeClaude(invokeOpts);
-
-  if (!result.success) {
-    logger.warn(`Agent query failed for ${config.role}: ${result.error}`);
-    // Return the error as content so the meeting can continue
-    return `[Error from ${config.role}] ${result.error ?? 'Unknown error during agent invocation'}`;
-  }
-
-  return result.output;
-}
 
 // ---------------------------------------------------------------------------
 // Transcript helpers (direct DB access since there is no transcript store)
@@ -131,232 +81,85 @@ function getTranscript(meetingId: string): TranscriptEntry[] {
 }
 
 // ---------------------------------------------------------------------------
-// MeetingRunner
+// MeetingRunner — data-only utility (no agent invocation)
+//
+// Stores transcript entries and generates minutes from stored transcripts.
+// Actual agent dispatch is handled by Claude Code's Agent tool, orchestrated
+// by skill/agent markdown files.
 // ---------------------------------------------------------------------------
 
 export class MeetingRunner {
   private readonly meetingId: string;
-  private readonly leaders: AgentNode[];
-  private readonly maxRoundsPerItem: number;
-  private readonly projectContext: string | undefined;
 
-  constructor(meetingId: string, leaders: AgentNode[], projectContext?: string) {
+  constructor(meetingId: string) {
     this.meetingId = meetingId;
-    this.leaders = leaders;
-    this.maxRoundsPerItem = DEFAULT_MEETING_CONFIG.maxRoundsPerItem;
-    this.projectContext = projectContext;
   }
 
-  // ---- public entry point -------------------------------------------------
+  // ---- Add transcript entry (called by MCP tool add-transcript) -----------
 
   /**
-   * Run the complete meeting lifecycle: opening -> discussion -> synthesis -> minutes.
+   * Add a transcript entry for this meeting.
+   * Returns the created TranscriptEntry.
    */
-  async run(): Promise<void> {
+  addTranscript(
+    speakerRole: string,
+    agendaItemIndex: number,
+    roundNumber: number,
+    content: string,
+  ): TranscriptEntry {
     const meeting = getMeeting(this.meetingId);
     if (!meeting) {
       throw new Error(`Meeting not found: ${this.meetingId}`);
     }
 
-    logger.info(`Starting meeting: ${meeting.topic}`, { meetingId: this.meetingId });
+    // Use speakerRole as speakerId since we no longer manage agent nodes here
+    const entry = insertTranscriptEntry(
+      this.meetingId,
+      speakerRole,
+      speakerRole,
+      agendaItemIndex,
+      roundNumber,
+      content,
+    );
 
-    try {
-      await this.openingPhase();
-      await this.discussionPhase();
-      await this.synthesisPhase();
-      await this.generateMinutes();
+    logger.debug(`Transcript added: ${speakerRole} (item ${agendaItemIndex}, round ${roundNumber})`, {
+      meetingId: this.meetingId,
+    });
 
-      updateMeeting(this.meetingId, {
-        status: 'completed' as MeetingStatus,
-        completedAt: Date.now(),
-      });
-
-      logger.info(`Meeting completed: ${meeting.topic}`, { meetingId: this.meetingId });
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      logger.error(`Meeting failed: ${errorMsg}`, { meetingId: this.meetingId });
-
-      updateMeeting(this.meetingId, {
-        status: 'failed' as MeetingStatus,
-        completedAt: Date.now(),
-      });
-
-      throw err;
-    }
+    return entry;
   }
 
-  // ---- phases -------------------------------------------------------------
+  // ---- Generate minutes from all transcripts ------------------------------
 
   /**
-   * Opening phase: each leader states their initial position on the meeting
-   * topic and agenda.
+   * Generate meeting minutes by formatting all stored transcript entries.
+   * Returns the minutesId of the created minutes record.
    */
-  private async openingPhase(): Promise<void> {
-    this.setPhase('opening');
-
-    const meeting = getMeeting(this.meetingId)!;
-    const agendaText = meeting.agenda.map((a, i) => `  ${i + 1}. ${a}`).join('\n');
-
-    for (const leader of this.leaders) {
-      const prompt =
-        `MEETING OPENING\n\n` +
-        `Topic: ${meeting.topic}\n` +
-        `Agenda:\n${agendaText}\n\n` +
-        `Please state your initial position on this topic from your department's perspective. ` +
-        `Identify any concerns, dependencies, or risks relevant to your area.`;
-
-      const config: AgentQueryConfig = {
-        role: leader.role,
-        department: leader.department,
-        systemPrompt: getLeaderSystemPrompt(leader.department, undefined, this.projectContext),
-      };
-
-      const response = await queryAgent(config, prompt);
-
-      insertTranscriptEntry(
-        this.meetingId,
-        leader.id,
-        leader.role,
-        -1, // -1 signals the opening phase (not tied to a specific agenda item)
-        0,
-        response,
-      );
-
-      eventBus.emitAgentEvent({
-        kind: 'message_sent',
-        fromId: leader.id,
-        toId: 'meeting',
-        summary: `[Opening] ${leader.role}: ${response.slice(0, 80)}...`,
-      });
-
-      logger.debug(`Opening statement from ${leader.role}`, {
-        meetingId: this.meetingId,
-        agentId: leader.id,
-      });
+  async generateMinutes(): Promise<string> {
+    const meeting = getMeeting(this.meetingId);
+    if (!meeting) {
+      throw new Error(`Meeting not found: ${this.meetingId}`);
     }
-  }
 
-  /**
-   * Discussion phase: for each agenda item, leaders take turns responding in
-   * round-robin fashion for up to `maxRoundsPerItem` rounds.
-   */
-  private async discussionPhase(): Promise<void> {
-    this.setPhase('discussion');
+    // Update phase
+    updateMeeting(this.meetingId, {
+      phase: 'minutes-generation' as MeetingPhase,
+      status: 'minutes-generation' as MeetingStatus,
+    });
 
-    const meeting = getMeeting(this.meetingId)!;
-
-    for (let itemIdx = 0; itemIdx < meeting.agenda.length; itemIdx++) {
-      const agendaItem = meeting.agenda[itemIdx];
-
-      logger.info(`Discussing agenda item ${itemIdx + 1}: ${agendaItem}`, {
-        meetingId: this.meetingId,
-      });
-
-      for (let round = 1; round <= this.maxRoundsPerItem; round++) {
-        for (const leader of this.leaders) {
-          // Build the prompt with full transcript context
-          const transcript = getTranscript(this.meetingId);
-          const transcriptText = this.formatTranscript(transcript);
-
-          const prompt =
-            `MEETING DISCUSSION — Round ${round}/${this.maxRoundsPerItem}\n\n` +
-            `Current agenda item (${itemIdx + 1}/${meeting.agenda.length}): ${agendaItem}\n\n` +
-            `Transcript so far:\n${transcriptText}\n\n` +
-            `Provide your department's perspective on this agenda item. ` +
-            `Build on what others have said. If you agree, say so and add specifics. ` +
-            `If you disagree, state your reasoning and propose an alternative.`;
-
-          const config: AgentQueryConfig = {
-            role: leader.role,
-            department: leader.department,
-            systemPrompt: getLeaderSystemPrompt(leader.department, undefined, this.projectContext),
-          };
-
-          const response = await queryAgent(config, prompt);
-
-          insertTranscriptEntry(
-            this.meetingId,
-            leader.id,
-            leader.role,
-            itemIdx,
-            round,
-            response,
-          );
-
-          eventBus.emitAgentEvent({
-            kind: 'message_sent',
-            fromId: leader.id,
-            toId: 'meeting',
-            summary: `[Item ${itemIdx + 1}, R${round}] ${leader.role}: ${response.slice(0, 80)}...`,
-          });
-        }
-      }
-    }
-  }
-
-  /**
-   * Synthesis phase: each leader states their final position, commitments,
-   * and action items.
-   */
-  private async synthesisPhase(): Promise<void> {
-    this.setPhase('synthesis');
-
-    const transcript = getTranscript(this.meetingId);
-    const transcriptText = this.formatTranscript(transcript);
-
-    for (const leader of this.leaders) {
-      const prompt =
-        `MEETING SYNTHESIS\n\n` +
-        `The discussion is complete. Here is the full transcript:\n${transcriptText}\n\n` +
-        `State your final position. List the action items your department commits to. ` +
-        `Flag any unresolved concerns or items requiring user decision.`;
-
-      const config: AgentQueryConfig = {
-        role: leader.role,
-        department: leader.department,
-        systemPrompt: getLeaderSystemPrompt(leader.department, undefined, this.projectContext),
-      };
-
-      const response = await queryAgent(config, prompt);
-
-      insertTranscriptEntry(
-        this.meetingId,
-        leader.id,
-        leader.role,
-        -2, // -2 signals synthesis phase
-        0,
-        response,
-      );
-
-      eventBus.emitAgentEvent({
-        kind: 'message_sent',
-        fromId: leader.id,
-        toId: 'meeting',
-        summary: `[Synthesis] ${leader.role}: ${response.slice(0, 80)}...`,
-      });
-    }
-  }
-
-  /**
-   * Generate meeting minutes by concatenating and formatting the transcript.
-   *
-   * In the future this will use a dedicated minutes-writer agent.  For now it
-   * formats the transcript into a structured summary.
-   */
-  private async generateMinutes(): Promise<void> {
-    this.setPhase('minutes-generation');
-
-    const meeting = getMeeting(this.meetingId)!;
     const transcript = getTranscript(this.meetingId);
 
     // --- Build the minutes content ---
 
     const sections: string[] = [];
 
+    // Collect unique speaker roles from transcript
+    const speakerRoles = [...new Set(transcript.map((e) => e.speakerRole))];
+
     sections.push(`# Meeting Minutes`);
     sections.push(`## Topic: ${meeting.topic}`);
     sections.push(`## Date: ${new Date().toISOString()}`);
-    sections.push(`## Participants: ${this.leaders.map((l) => l.role).join(', ')}`);
+    sections.push(`## Participants: ${speakerRoles.join(', ')}`);
     sections.push('');
 
     // Agenda
@@ -405,59 +208,52 @@ export class MeetingRunner {
 
     // --- Extract action items from synthesis entries ---
 
-    const actionItems: ActionItem[] = this.leaders.map((leader, idx) => ({
+    const actionItems: ActionItem[] = speakerRoles.map((role, idx) => ({
       id: `action-${this.meetingId}-${idx}`,
-      title: `${leader.role} deliverables`,
-      description: `Action items committed by ${leader.role} during synthesis phase`,
-      assignedDepartment: leader.department,
-      assignedRole: leader.role,
+      title: `${role} deliverables`,
+      description: `Action items committed by ${role} during synthesis phase`,
+      assignedDepartment: 'engineering', // default; will be refined by compactor
+      assignedRole: role,
       priority: 'medium' as const,
       dependencies: [],
       acceptanceCriteria: ['Deliverables completed as stated in final position'],
     }));
 
-    createMinutes({
+    const minutesRecord = createMinutes({
       meetingId: this.meetingId,
       format: 'summary',
       content,
       actionItems,
     });
 
-    logger.info('Minutes generated', { meetingId: this.meetingId });
-  }
-
-  // ---- helpers ------------------------------------------------------------
-
-  private setPhase(phase: MeetingPhase): void {
-    const statusMap: Record<MeetingPhase, MeetingStatus> = {
-      'orchestrator-phase': 'pending',
-      'convening': 'convening',
-      'opening': 'opening',
-      'discussion': 'discussion',
-      'research-break': 'discussion',
-      'synthesis': 'synthesis',
-      'minutes-generation': 'minutes-generation',
-    };
-
+    // Mark meeting as completed
     updateMeeting(this.meetingId, {
-      phase,
-      status: statusMap[phase] ?? 'discussion',
+      status: 'completed' as MeetingStatus,
+      completedAt: Date.now(),
     });
 
-    logger.debug(`Meeting phase: ${phase}`, { meetingId: this.meetingId });
+    logger.info('Minutes generated', { meetingId: this.meetingId });
+
+    return minutesRecord.id;
   }
 
-  private formatTranscript(entries: TranscriptEntry[]): string {
-    if (entries.length === 0) return '(No transcript entries yet)';
+  // ---- Completion status --------------------------------------------------
 
-    return entries
-      .map((e) => {
-        let phaseLabel: string;
-        if (e.agendaItemIndex === -1) phaseLabel = 'Opening';
-        else if (e.agendaItemIndex === -2) phaseLabel = 'Synthesis';
-        else phaseLabel = `Item ${e.agendaItemIndex + 1}, Round ${e.roundNumber}`;
-        return `[${phaseLabel}] ${e.speakerRole}: ${e.content}`;
-      })
-      .join('\n\n');
+  /**
+   * Check whether the meeting has been completed (minutes generated).
+   */
+  isComplete(): boolean {
+    const meeting = getMeeting(this.meetingId);
+    if (!meeting) return false;
+    return ['completed', 'compacted', 'reported'].includes(meeting.status);
+  }
+
+  // ---- Transcript access --------------------------------------------------
+
+  /**
+   * Get all transcript entries for this meeting.
+   */
+  getTranscript(): TranscriptEntry[] {
+    return getTranscript(this.meetingId);
   }
 }

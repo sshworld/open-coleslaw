@@ -3,7 +3,6 @@ import type {
   Department,
   Meeting,
   MentionRecord,
-  AgentNode,
 } from '../types/index.js';
 import {
   createMeeting,
@@ -16,10 +15,7 @@ import {
 } from '../storage/index.js';
 import type { AgentTreeNode } from '../storage/index.js';
 import { LeaderPool } from './leader-pool.js';
-import { MeetingRunner } from './meeting-runner.js';
-import { eventBus } from './event-bus.js';
 import { logger } from '../utils/logger.js';
-import { analyzeProject, formatProjectContext } from '../agents/project-analyzer.js';
 
 // ---------------------------------------------------------------------------
 // Keyword maps for leader selection heuristics
@@ -54,13 +50,21 @@ const DEPARTMENT_KEYWORDS: Record<Department, string[]> = {
 };
 
 // ---------------------------------------------------------------------------
-// StartMeeting options
+// StartMeeting options & result
 // ---------------------------------------------------------------------------
 
 export interface StartMeetingOptions {
   topic: string;
   agenda: string[];
   departments?: Department[];
+  previousMeetingId?: string | null;
+}
+
+export interface StartMeetingResult {
+  meetingId: string;
+  departments: Department[];
+  agenda: string[];
+  topic: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -74,7 +78,10 @@ export interface OrchestratorStatus {
 }
 
 // ---------------------------------------------------------------------------
-// Orchestrator
+// Orchestrator — creates meeting records and selects leaders
+//
+// No longer runs meetings itself. Meetings are orchestrated by Claude Code's
+// Agent tool via skill/agent markdown files.
 // ---------------------------------------------------------------------------
 
 export class Orchestrator {
@@ -148,89 +155,57 @@ export class Orchestrator {
   // ---- start meeting ------------------------------------------------------
 
   /**
-   * Start a new meeting.
+   * Create a new meeting record and return meeting info + recommended leaders.
    *
-   * 1. Selects departments (if not provided).
-   * 2. Creates the meeting record in SQLite.
-   * 3. Spawns leaders via the LeaderPool.
-   * 4. Runs the MeetingRunner lifecycle (opening -> discussion -> synthesis -> minutes).
-   * 5. Deactivates leaders after completion.
-   *
-   * Returns the meeting ID.
+   * Does NOT run the meeting. The calling agent (via skill markdown) is
+   * responsible for orchestrating the meeting phases using add-transcript
+   * and generate-minutes MCP tools.
    */
-  async startMeeting(opts: StartMeetingOptions & { previousMeetingId?: string | null }): Promise<string> {
+  startMeeting(opts: StartMeetingOptions): StartMeetingResult {
     const { topic, agenda } = opts;
     const departments = opts.departments ?? this.selectLeaders(topic, agenda);
 
-    logger.info(`Starting meeting: "${topic}" with departments: [${departments.join(', ')}]`);
+    logger.info(`Creating meeting: "${topic}" with departments: [${departments.join(', ')}]`);
 
-    // 0. Analyse the current working directory for project context
-    let projectContext: string | undefined;
-    try {
-      const analysis = await analyzeProject(process.cwd());
-      projectContext = formatProjectContext(analysis);
-      logger.debug('Project analysis complete', { meetingId: topic });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      logger.warn(`Project analysis failed (proceeding without context): ${msg}`);
-    }
-
-    // 1. Create the meeting record
+    // Create the meeting record
     const meetingId = uuidv4();
-    const meeting = createMeeting({
+    createMeeting({
       id: meetingId,
       topic,
       agenda,
-      participantIds: [], // Will be filled in after leader spawning
+      participantIds: departments.map((d) => `${d}-leader`),
       initiatedBy: this.orchestratorId,
-      status: 'convening',
-      phase: 'convening',
+      status: 'pending',
+      phase: 'orchestrator-phase',
       startedAt: Date.now(),
       previousMeetingId: opts.previousMeetingId ?? null,
     });
 
-    // 2. Spawn leaders
-    const leaders: AgentNode[] = [];
-    for (const dept of departments) {
-      const leader = this.leaderPool.spawnLeader(dept, meetingId);
-      leaders.push(leader);
-    }
-
-    // Update meeting with participant IDs
-    updateMeeting(meetingId, {
-      participantIds: leaders.map((l) => l.id),
-    });
-
-    // 3. Run the meeting (with project context for leader prompts)
-    const runner = new MeetingRunner(meetingId, leaders, projectContext);
-
-    try {
-      await runner.run();
-    } finally {
-      // 4. Deactivate leaders regardless of success/failure
-      for (const leader of leaders) {
-        this.leaderPool.deactivateLeader(leader.id);
-      }
-    }
-
-    return meetingId;
+    return {
+      meetingId,
+      departments,
+      agenda,
+      topic,
+    };
   }
 
   // ---- chain meeting -------------------------------------------------------
 
   /**
-   * Chain a new meeting from the output of a previous meeting.
+   * Create a new meeting chained from a previous meeting.
    *
    * Loads minutes from the previous meeting and includes them as context for
    * the new meeting topic. The new meeting's `previousMeetingId` is set for
    * traceability.
+   *
+   * Does NOT run the meeting (same as startMeeting).
    */
-  async chainMeeting(opts: {
+  chainMeeting(opts: {
     previousMeetingId: string;
     topic: string;
     agenda: string[];
     departments?: Department[];
-  }): Promise<string> {
+  }): StartMeetingResult {
     const previousMeeting = getMeeting(opts.previousMeetingId);
     if (!previousMeeting) {
       throw new Error(`Previous meeting not found: ${opts.previousMeetingId}`);

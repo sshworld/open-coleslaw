@@ -22,19 +22,11 @@ export async function startMeetingHandler({
 }): Promise<{ content: { type: 'text'; text: string }[]; isError?: boolean }> {
   try {
     const orchestrator = new Orchestrator();
-    const meetingId = await orchestrator.startMeeting({
+    const result = orchestrator.startMeeting({
       topic,
       agenda,
       departments: departments as Department[] | undefined,
     });
-
-    const result = {
-      meetingId,
-      status: 'started',
-      topic,
-      agenda,
-      departments: departments ?? orchestrator.selectLeaders(topic, agenda),
-    };
 
     return {
       content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
