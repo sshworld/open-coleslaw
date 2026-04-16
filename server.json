@@ -3,7 +3,7 @@
   "name": "open-coleslaw",
   "title": "Open Coleslaw — Multi-Agent Orchestrator",
   "description": "Like coleslaw — it's already prepared, just scoop and eat.",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "locals": [
     {
       "type": "stdio",
