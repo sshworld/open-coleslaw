@@ -14,6 +14,7 @@
   },
   "files": [
     "dist",
+    "src/assets",
     "README.md",
     "LICENSE"
   ],
@@ -36,7 +37,11 @@
     "orchestrator",
     "multi-agent"
   ],
-  "author": "",
+  "author": "sshworld",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sshworld/open-coleslaw.git"
+  },
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

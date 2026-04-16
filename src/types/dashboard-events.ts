@@ -42,3 +42,71 @@ export type AgentEvent =
   | { kind: 'mention_created'; mentionId: string; summary: string; urgency: 'blocking' | 'advisory' }
   | { kind: 'mention_resolved'; mentionId: string; decision: string }
   | { kind: 'cost_update'; totalCost: number };
+
+// ---------------------------------------------------------------------------
+// Multi-session types
+// ---------------------------------------------------------------------------
+
+export interface ProjectSession {
+  sessionId: string;
+  projectPath: string;
+  projectName: string;
+  displayName: string;
+  isActive: boolean;
+}
+
+export interface RegisterMessage {
+  type: 'register';
+  sessionId: string;
+  projectPath: string;
+  projectName: string;
+}
+
+export interface SessionEventMessage {
+  type: 'session-event';
+  sessionId: string;
+  event: AgentEvent;
+}
+
+export interface UnregisterMessage {
+  type: 'unregister';
+  sessionId: string;
+}
+
+export type ServerMessage = RegisterMessage | SessionEventMessage | UnregisterMessage;
+
+export interface MultiSessionSnapshot {
+  type: 'multi-snapshot';
+  sessions: Array<{
+    sessionId: string;
+    displayName: string;
+    projectPath: string;
+    isActive: boolean;
+    snapshot: {
+      agents: AgentState[];
+      edges: EdgeState[];
+      meeting: MeetingState | null;
+      totalCost: number;
+    };
+  }>;
+}
+
+export interface SessionDelta {
+  type: 'session-delta';
+  sessionId: string;
+  displayName: string;
+  timestamp: number;
+  events: AgentEvent[];
+}
+
+export interface SessionRegistered {
+  type: 'session-registered';
+  sessionId: string;
+  displayName: string;
+  projectPath: string;
+}
+
+export interface SessionUnregistered {
+  type: 'session-unregistered';
+  sessionId: string;
+}

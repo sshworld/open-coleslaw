@@ -8,6 +8,15 @@ export type {
   MeetingState,
   DashboardEvent,
   AgentEvent,
+  ProjectSession,
+  RegisterMessage,
+  SessionEventMessage,
+  UnregisterMessage,
+  ServerMessage,
+  MultiSessionSnapshot,
+  SessionDelta,
+  SessionRegistered,
+  SessionUnregistered,
 } from '../types/dashboard-events.js';
 
 export type { AgentTier, AgentStatus } from '../types/agent.js';

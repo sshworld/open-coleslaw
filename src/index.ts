@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createServer } from './server.js';
 import { ensureDataDirs } from './utils/config.js';
@@ -10,7 +11,11 @@ async function main() {
   await server.connect(transport);
 
   // Start dashboard alongside MCP server
-  startDashboard();
+  const sessionId = randomUUID();
+  const projectPath = process.cwd();
+  const projectName = projectPath.split('/').pop() ?? 'unknown';
+
+  await startDashboard({ sessionId, projectPath, projectName });
 }
 
 main().catch((error) => {

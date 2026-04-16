@@ -2,6 +2,8 @@
  * getDashboardHTML() — returns the full inline HTML/CSS/JS for the Open Coleslaw
  * real-time dashboard.  Everything is self-contained; the only external deps are
  * Cytoscape.js + dagre loaded from CDN.
+ *
+ * Multi-session aware: one tab per project session in the tab bar.
  */
 
 export function getDashboardHTML(): string {
@@ -54,15 +56,16 @@ html, body {
 }
 
 /* ===================================================================
-   LAYOUT — four areas via CSS Grid
+   LAYOUT — five areas via CSS Grid
    =================================================================== */
 #app {
   display: grid;
   width: 100%; height: 100%;
-  grid-template-rows: 48px 1fr 200px;
+  grid-template-rows: 48px 36px 1fr 200px;
   grid-template-columns: 1fr 320px;
   grid-template-areas:
     "header  header"
+    "tabs    tabs"
     "graph   sidebar"
     "log     log";
 }
@@ -135,6 +138,82 @@ html, body {
 .badge.purple { background: rgba(168,85,247,0.1); border-color: rgba(168,85,247,0.3); }
 .badge.amber  { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.3); color: var(--warning); }
 .badge.green  { background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.3); color: var(--success); }
+
+/* ===================================================================
+   TAB BAR
+   =================================================================== */
+#tab-bar {
+  grid-area: tabs;
+  display: flex;
+  align-items: stretch;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 12px;
+  gap: 2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+#tab-bar::-webkit-scrollbar { display: none; }
+
+.session-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  font-size: 11px;
+  font-family: var(--font);
+  font-weight: 500;
+  color: var(--text2);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.2s, border-color 0.2s, opacity 0.2s;
+  position: relative;
+}
+.session-tab:hover {
+  color: var(--text);
+  background: rgba(255,255,255,0.02);
+}
+.session-tab.active {
+  color: var(--cyan);
+  border-bottom-color: var(--cyan);
+  text-shadow: 0 0 8px rgba(0,240,255,0.4);
+}
+.session-tab.inactive {
+  opacity: 0.45;
+  text-decoration: line-through;
+  color: var(--text2);
+}
+.session-tab.inactive:hover {
+  opacity: 0.6;
+}
+
+.tab-badge {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: rgba(0,240,255,0.15);
+  color: var(--cyan);
+  font-weight: 700;
+  min-width: 16px;
+  text-align: center;
+}
+.tab-badge.meeting {
+  background: rgba(245,158,11,0.2);
+  color: var(--warning);
+}
+
+.tab-empty-msg {
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text2);
+  font-style: italic;
+  padding: 0 8px;
+}
 
 /* ===================================================================
    GRAPH VIEWPORT
@@ -315,10 +394,21 @@ html, body {
   flex-shrink: 0;
   min-width: 64px;
 }
+.log-session {
+  color: var(--cyan);
+  font-size: 10px;
+  flex-shrink: 0;
+  min-width: 80px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.7;
+}
 .log-kind {
   font-weight: 600;
   flex-shrink: 0;
-  min-width: 100px;
+  min-width: 90px;
   font-size: 11px;
 }
 .log-msg {
@@ -339,6 +429,7 @@ html, body {
 .log-kind.mention  { color: var(--error); }
 .log-kind.resolved { color: var(--success); }
 .log-kind.cost     { color: var(--warning); }
+.log-kind.session  { color: var(--purple); }
 
 /* ===================================================================
    ANIMATIONS
@@ -350,10 +441,6 @@ html, body {
 @keyframes pulse-glow {
   0%, 100% { box-shadow: 0 0 4px rgba(0,240,255,0.3); }
   50%      { box-shadow: 0 0 18px rgba(0,240,255,0.7); }
-}
-@keyframes amber-pulse {
-  0%, 100% { opacity: 0.4; }
-  50%      { opacity: 1.0; }
 }
 
 /* Custom scrollbar */
@@ -377,11 +464,17 @@ html, body {
       <span id="conn-label">Connecting...</span>
     </div>
     <div class="right-stats">
+      <span class="badge" id="badge-sessions">0 sessions</span>
       <span class="badge" id="badge-agents">0 agents</span>
       <span class="badge purple" id="badge-meeting">No meeting</span>
       <span class="badge green" id="badge-cost">$0.0000</span>
     </div>
   </header>
+
+  <!-- TAB BAR ----------------------------------------------------------- -->
+  <div id="tab-bar">
+    <span class="tab-empty-msg" id="tab-empty">Waiting for sessions...</span>
+  </div>
 
   <!-- GRAPH ------------------------------------------------------------- -->
   <div id="graph-container">
@@ -407,135 +500,35 @@ html, body {
 
 <script>
 // ======================================================================
-// IIFE — all dashboard JS
+// IIFE -- all dashboard JS
 // ======================================================================
 (function () {
   'use strict';
 
   // ====================================================================
-  // 1. STATE STORE
+  // 1. STATE STORE  (per-session)
   // ====================================================================
-  const StateStore = {
-    agents: new Map(),    // id -> AgentState
-    edges: [],            // EdgeState[]
-    meeting: null,        // MeetingState | null
-    totalCost: 0,
-    selectedAgentId: null,
-    eventHistory: [],     // {kind, agentId, ...}[]
+  // sessions: Map<sessionId, { displayName, projectPath, isActive, agents: Map, edges: [], meeting, totalCost, eventHistory[] }>
+  const sessions = new Map();
+  let activeTabId = null;       // currently viewed session
+  let selectedAgentId = null;   // clicked node
 
-    applySnapshot(data) {
-      this.agents.clear();
-      (data.agents || []).forEach(a => this.agents.set(a.id, a));
-      this.edges = data.edges || [];
-      this.meeting = data.meeting || null;
-      StatusBar.update();
-    },
+  function getSession(id) { return sessions.get(id); }
 
-    applyDelta(data) {
-      (data.events || []).forEach(ev => this.applyEvent(ev));
-      StatusBar.update();
-    },
-
-    applyEvent(ev) {
-      this.eventHistory.push(ev);
-      EventLog.append(ev);
-
-      switch (ev.kind) {
-        case 'agent_spawned': {
-          const agent = {
-            id: ev.agentId,
-            type: ev.agentType,
-            label: ev.label,
-            status: 'idle',
-            parentId: ev.parentId,
-            department: ev.department,
-            currentTask: null,
-            costUsd: 0,
-          };
-          this.agents.set(ev.agentId, agent);
-
-          GraphRenderer.addNode(agent);
-
-          if (ev.parentId) {
-            const edge = {
-              id: 'edge-' + ev.parentId + '-' + ev.agentId,
-              source: ev.parentId,
-              target: ev.agentId,
-              edgeType: 'hierarchy',
-              active: true,
-              label: '',
-            };
-            this.edges.push(edge);
-            GraphRenderer.addEdge(edge);
-          }
-          break;
-        }
-        case 'agent_destroyed': {
-          this.agents.delete(ev.agentId);
-          this.edges = this.edges.filter(e => e.source !== ev.agentId && e.target !== ev.agentId);
-          GraphRenderer.removeNode(ev.agentId);
-          if (this.selectedAgentId === ev.agentId) {
-            this.selectedAgentId = null;
-            SidebarPanel.clear();
-          }
-          break;
-        }
-        case 'state_changed': {
-          const a = this.agents.get(ev.agentId);
-          if (a) { a.status = ev.to; GraphRenderer.updateNode(a); }
-          break;
-        }
-        case 'task_assigned': {
-          const a = this.agents.get(ev.agentId);
-          if (a) { a.currentTask = ev.taskSummary; a.status = 'working'; GraphRenderer.updateNode(a); }
-          break;
-        }
-        case 'task_completed': {
-          const a = this.agents.get(ev.agentId);
-          if (a) { a.currentTask = null; a.status = ev.result === 'success' ? 'completed' : 'failed'; GraphRenderer.updateNode(a); }
-          break;
-        }
-        case 'message_sent': {
-          const edgeId = 'msg-' + ev.fromId + '-' + ev.toId + '-' + Date.now();
-          const edge = { id: edgeId, source: ev.fromId, target: ev.toId, edgeType: 'message', active: true, label: ev.summary };
-          this.edges.push(edge);
-          GraphRenderer.addEdge(edge);
-          setTimeout(() => {
-            this.edges = this.edges.filter(e => e.id !== edgeId);
-            GraphRenderer.removeEdge(edgeId);
-          }, 5000);
-          break;
-        }
-        case 'mention_created': {
-          break;
-        }
-        case 'mention_resolved': {
-          break;
-        }
-        case 'cost_update': {
-          this.totalCost = ev.totalCost;
-          break;
-        }
-      }
-
-      // Refresh sidebar if the selected agent was affected
-      if (this.selectedAgentId) {
-        const agentId = ev.agentId || ev.fromId || ev.toId || null;
-        if (agentId === this.selectedAgentId) {
-          SidebarPanel.show(this.selectedAgentId);
-        }
-      }
-    },
-  };
+  function activeSession() {
+    if (!activeTabId) return null;
+    return sessions.get(activeTabId) || null;
+  }
 
   // ====================================================================
-  // 2. CONNECTION MANAGER — WebSocket with exponential backoff
+  // 2. CONNECTION MANAGER -- WebSocket with exponential backoff
   // ====================================================================
   const ConnectionManager = {
     ws: null,
     backoff: 1000,
     maxBackoff: 30000,
     timer: null,
+    _heartbeat: null,
 
     connect() {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -551,14 +544,7 @@ html, body {
       this.ws.onmessage = (msg) => {
         try {
           const data = JSON.parse(msg.data);
-          if (data.type === 'snapshot') {
-            StateStore.applySnapshot(data);
-            GraphRenderer.rebuild();
-          } else if (data.type === 'delta') {
-            StateStore.applyDelta(data);
-          } else if (data.type === 'pong') {
-            // heartbeat response
-          }
+          this.handleMessage(data);
         } catch (e) {
           console.error('[WS] Parse error:', e);
         }
@@ -569,16 +555,125 @@ html, body {
         this.scheduleReconnect();
       };
 
-      this.ws.onerror = () => {
-        // onclose will fire after this
-      };
+      this.ws.onerror = () => {};
 
-      // Heartbeat every 25s
+      if (this._heartbeat) clearInterval(this._heartbeat);
       this._heartbeat = setInterval(() => {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
           this.ws.send(JSON.stringify({ type: 'ping' }));
         }
       }, 25000);
+    },
+
+    handleMessage(data) {
+      switch (data.type) {
+        case 'multi-snapshot':
+          this.handleMultiSnapshot(data);
+          break;
+        case 'session-delta':
+          this.handleSessionDelta(data);
+          break;
+        case 'session-registered':
+          this.handleSessionRegistered(data);
+          break;
+        case 'session-unregistered':
+          this.handleSessionUnregistered(data);
+          break;
+        case 'pong':
+          break;
+        default:
+          break;
+      }
+    },
+
+    handleMultiSnapshot(data) {
+      sessions.clear();
+      (data.sessions || []).forEach(function (s) {
+        var agentsMap = new Map();
+        (s.snapshot.agents || []).forEach(function (a) { agentsMap.set(a.id, a); });
+        sessions.set(s.sessionId, {
+          displayName: s.displayName,
+          projectPath: s.projectPath,
+          isActive: s.isActive,
+          agents: agentsMap,
+          edges: s.snapshot.edges || [],
+          meeting: s.snapshot.meeting || null,
+          totalCost: s.snapshot.totalCost || 0,
+          eventHistory: [],
+        });
+      });
+      // Auto-select first active tab if none selected
+      if (!activeTabId || !sessions.has(activeTabId)) {
+        var first = null;
+        sessions.forEach(function (s, id) { if (!first && s.isActive) first = id; });
+        if (!first && sessions.size > 0) first = sessions.keys().next().value;
+        activeTabId = first;
+      }
+      TabBar.render();
+      StatusBar.update();
+      GraphRenderer.rebuild();
+    },
+
+    handleSessionDelta(data) {
+      var sess = sessions.get(data.sessionId);
+      if (!sess) {
+        // Session not yet known -- create a placeholder
+        sess = {
+          displayName: data.displayName,
+          projectPath: '',
+          isActive: true,
+          agents: new Map(),
+          edges: [],
+          meeting: null,
+          totalCost: 0,
+          eventHistory: [],
+        };
+        sessions.set(data.sessionId, sess);
+        TabBar.render();
+      }
+
+      (data.events || []).forEach(function (ev) {
+        applyEventToSession(data.sessionId, sess, ev);
+      });
+
+      TabBar.updateBadge(data.sessionId);
+      StatusBar.update();
+
+      // Rebuild graph only if this is the active tab
+      if (data.sessionId === activeTabId) {
+        GraphRenderer.rebuild();
+        if (selectedAgentId) SidebarPanel.show(selectedAgentId);
+      }
+    },
+
+    handleSessionRegistered(data) {
+      if (!sessions.has(data.sessionId)) {
+        sessions.set(data.sessionId, {
+          displayName: data.displayName,
+          projectPath: data.projectPath,
+          isActive: true,
+          agents: new Map(),
+          edges: [],
+          meeting: null,
+          totalCost: 0,
+          eventHistory: [],
+        });
+      }
+      // Auto-select if no tab is active
+      if (!activeTabId) activeTabId = data.sessionId;
+      TabBar.render();
+      StatusBar.update();
+      EventLog.appendSystem(data.displayName, 'Session connected');
+    },
+
+    handleSessionUnregistered(data) {
+      var sess = sessions.get(data.sessionId);
+      if (sess) {
+        sess.isActive = false;
+        TabBar.render();
+        StatusBar.update();
+        EventLog.appendSystem(sess.displayName, 'Session disconnected');
+      }
     },
 
     scheduleReconnect() {
@@ -590,8 +685,8 @@ html, body {
     },
 
     setStatus(status) {
-      const dot = document.getElementById('conn-dot');
-      const label = document.getElementById('conn-label');
+      var dot = document.getElementById('conn-dot');
+      var label = document.getElementById('conn-label');
       dot.className = 'conn-dot';
       if (status === 'connected') {
         dot.classList.add('connected');
@@ -606,12 +701,169 @@ html, body {
   };
 
   // ====================================================================
-  // 3. GRAPH RENDERER — Cytoscape.js
+  // Event application (scoped to a session)
   // ====================================================================
-  const GraphRenderer = {
-    cy: null,
+  function applyEventToSession(sessionId, sess, ev) {
+    sess.eventHistory.push(ev);
+    if (sess.eventHistory.length > 500) sess.eventHistory.shift();
 
-    init() {
+    EventLog.append(sessionId, sess.displayName, ev);
+
+    switch (ev.kind) {
+      case 'agent_spawned': {
+        var agent = {
+          id: ev.agentId,
+          type: ev.agentType,
+          label: ev.label,
+          status: 'idle',
+          parentId: ev.parentId,
+          department: ev.department,
+          currentTask: null,
+          costUsd: 0,
+        };
+        sess.agents.set(ev.agentId, agent);
+        if (ev.parentId) {
+          sess.edges.push({
+            id: 'edge-' + ev.parentId + '-' + ev.agentId,
+            source: ev.parentId,
+            target: ev.agentId,
+            edgeType: 'hierarchy',
+            active: true,
+            label: '',
+          });
+        }
+        break;
+      }
+      case 'agent_destroyed': {
+        sess.agents.delete(ev.agentId);
+        sess.edges = sess.edges.filter(function (e) {
+          return e.source !== ev.agentId && e.target !== ev.agentId;
+        });
+        if (sessionId === activeTabId && selectedAgentId === ev.agentId) {
+          selectedAgentId = null;
+          SidebarPanel.clear();
+        }
+        break;
+      }
+      case 'state_changed': {
+        var a = sess.agents.get(ev.agentId);
+        if (a) a.status = ev.to;
+        break;
+      }
+      case 'task_assigned': {
+        var a = sess.agents.get(ev.agentId);
+        if (a) { a.currentTask = ev.taskSummary; a.status = 'working'; }
+        break;
+      }
+      case 'task_completed': {
+        var a = sess.agents.get(ev.agentId);
+        if (a) { a.currentTask = null; a.status = ev.result === 'success' ? 'completed' : 'failed'; }
+        break;
+      }
+      case 'message_sent': {
+        var edgeId = 'msg-' + ev.fromId + '-' + ev.toId + '-' + Date.now();
+        var edge = { id: edgeId, source: ev.fromId, target: ev.toId, edgeType: 'message', active: true, label: ev.summary };
+        sess.edges.push(edge);
+        setTimeout(function () {
+          sess.edges = sess.edges.filter(function (e) { return e.id !== edgeId; });
+          if (sessionId === activeTabId) GraphRenderer.rebuild();
+        }, 5000);
+        break;
+      }
+      case 'cost_update': {
+        sess.totalCost = ev.totalCost;
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  // ====================================================================
+  // 3. TAB BAR
+  // ====================================================================
+  var TabBar = {
+    render: function () {
+      var bar = document.getElementById('tab-bar');
+      var emptyMsg = document.getElementById('tab-empty');
+
+      // Remove old tabs (keep the empty msg span)
+      var old = bar.querySelectorAll('.session-tab');
+      old.forEach(function (el) { el.remove(); });
+
+      if (sessions.size === 0) {
+        emptyMsg.style.display = '';
+        return;
+      }
+      emptyMsg.style.display = 'none';
+
+      sessions.forEach(function (sess, sessionId) {
+        var tab = document.createElement('button');
+        tab.className = 'session-tab';
+        if (sessionId === activeTabId) tab.classList.add('active');
+        if (!sess.isActive) tab.classList.add('inactive');
+        tab.dataset.sessionId = sessionId;
+
+        // Tab label
+        var lbl = document.createElement('span');
+        lbl.textContent = sess.displayName || sessionId.slice(0, 8);
+        tab.appendChild(lbl);
+
+        // Agent count badge
+        var badge = document.createElement('span');
+        badge.className = 'tab-badge';
+        badge.textContent = String(sess.agents.size);
+        tab.appendChild(badge);
+
+        // Meeting indicator
+        if (sess.meeting) {
+          var mb = document.createElement('span');
+          mb.className = 'tab-badge meeting';
+          mb.textContent = 'MTG';
+          tab.appendChild(mb);
+        }
+
+        tab.addEventListener('click', function () {
+          TabBar.switchTo(sessionId);
+        });
+
+        bar.appendChild(tab);
+      });
+    },
+
+    switchTo: function (sessionId) {
+      activeTabId = sessionId;
+      selectedAgentId = null;
+      SidebarPanel.clear();
+      this.render();
+      StatusBar.update();
+      GraphRenderer.rebuild();
+    },
+
+    updateBadge: function (sessionId) {
+      var bar = document.getElementById('tab-bar');
+      var tabs = bar.querySelectorAll('.session-tab');
+      tabs.forEach(function (tab) {
+        if (tab.dataset.sessionId === sessionId) {
+          var sess = sessions.get(sessionId);
+          if (!sess) return;
+          var badge = tab.querySelector('.tab-badge:not(.meeting)');
+          if (badge) badge.textContent = String(sess.agents.size);
+        }
+      });
+    },
+  };
+
+  // ====================================================================
+  // 4. GRAPH RENDERER -- Cytoscape.js
+  // ====================================================================
+  var GraphRenderer = {
+    cy: null,
+    _layoutTimer: null,
+    _animFrame: null,
+    _dashOffset: 0,
+
+    init: function () {
       this.cy = cytoscape({
         container: document.getElementById('cy'),
         style: [
@@ -640,14 +892,12 @@ html, body {
           {
             selector: 'node[tier="orchestrator"]',
             style: {
-              'width': 60,
-              'height': 60,
+              'width': 60, 'height': 60,
               'border-width': 3,
               'border-color': '#00f0ff',
               'background-color': 'rgba(0,240,255,0.1)',
               'color': '#00f0ff',
-              'font-size': 12,
-              'font-weight': '700',
+              'font-size': 12, 'font-weight': '700',
               'text-outline-color': '#0a0e17',
               'text-outline-width': 2,
             },
@@ -656,22 +906,19 @@ html, body {
           {
             selector: 'node[tier="leader"]',
             style: {
-              'width': 48,
-              'height': 48,
+              'width': 48, 'height': 48,
               'border-width': 2,
               'border-color': '#a855f7',
               'background-color': 'rgba(168,85,247,0.1)',
               'color': '#a855f7',
-              'font-size': 11,
-              'font-weight': '600',
+              'font-size': 11, 'font-weight': '600',
             },
           },
           // Worker
           {
             selector: 'node[tier="worker"]',
             style: {
-              'width': 36,
-              'height': 36,
+              'width': 36, 'height': 36,
               'border-width': 2,
               'border-color': '#22d3ee',
               'background-color': 'rgba(34,211,238,0.08)',
@@ -680,82 +927,23 @@ html, body {
             },
           },
           // Status: idle
-          {
-            selector: 'node[status="idle"]',
-            style: {
-              'opacity': 0.5,
-              'border-color': '#475569',
-            },
-          },
-          // Status: working / executing
-          {
-            selector: 'node[status="working"]',
-            style: {
-              'border-width': 3,
-              'opacity': 1,
-            },
-          },
+          { selector: 'node[status="idle"]', style: { 'opacity': 0.5, 'border-color': '#475569' } },
+          // Status: working
+          { selector: 'node[status="working"]', style: { 'border-width': 3, 'opacity': 1 } },
           // Status: in-meeting
-          {
-            selector: 'node[status="in-meeting"]',
-            style: {
-              'border-color': '#f59e0b',
-              'background-color': 'rgba(245,158,11,0.1)',
-              'opacity': 1,
-            },
-          },
+          { selector: 'node[status="in-meeting"]', style: { 'border-color': '#f59e0b', 'background-color': 'rgba(245,158,11,0.1)', 'opacity': 1 } },
           // Status: spawning-workers
-          {
-            selector: 'node[status="spawning-workers"]',
-            style: {
-              'border-color': '#a855f7',
-              'opacity': 1,
-            },
-          },
+          { selector: 'node[status="spawning-workers"]', style: { 'border-color': '#a855f7', 'opacity': 1 } },
           // Status: waiting-for-user
-          {
-            selector: 'node[status="waiting-for-user"]',
-            style: {
-              'border-color': '#f59e0b',
-              'opacity': 0.8,
-            },
-          },
+          { selector: 'node[status="waiting-for-user"]', style: { 'border-color': '#f59e0b', 'opacity': 0.8 } },
           // Status: aggregating
-          {
-            selector: 'node[status="aggregating"]',
-            style: {
-              'border-color': '#22d3ee',
-              'opacity': 1,
-            },
-          },
+          { selector: 'node[status="aggregating"]', style: { 'border-color': '#22d3ee', 'opacity': 1 } },
           // Status: completed
-          {
-            selector: 'node[status="completed"]',
-            style: {
-              'border-color': '#10b981',
-              'background-color': 'rgba(16,185,129,0.1)',
-              'opacity': 0.7,
-            },
-          },
+          { selector: 'node[status="completed"]', style: { 'border-color': '#10b981', 'background-color': 'rgba(16,185,129,0.1)', 'opacity': 0.7 } },
           // Status: failed
-          {
-            selector: 'node[status="failed"]',
-            style: {
-              'border-color': '#ef4444',
-              'background-color': 'rgba(239,68,68,0.1)',
-              'opacity': 0.8,
-            },
-          },
+          { selector: 'node[status="failed"]', style: { 'border-color': '#ef4444', 'background-color': 'rgba(239,68,68,0.1)', 'opacity': 0.8 } },
           // Selected node
-          {
-            selector: 'node:selected',
-            style: {
-              'border-width': 4,
-              'overlay-padding': 6,
-              'overlay-color': '#00f0ff',
-              'overlay-opacity': 0.08,
-            },
-          },
+          { selector: 'node:selected', style: { 'border-width': 4, 'overlay-padding': 6, 'overlay-color': '#00f0ff', 'overlay-opacity': 0.08 } },
           // --- EDGES ---
           {
             selector: 'edge',
@@ -771,63 +959,11 @@ html, body {
               'transition-duration': '0.3s',
             },
           },
-          // Active hierarchy edges
-          {
-            selector: 'edge[edgeType="hierarchy"][?active]',
-            style: {
-              'line-color': '#475569',
-              'target-arrow-color': '#475569',
-              'line-style': 'solid',
-              'opacity': 0.6,
-              'width': 1.5,
-            },
-          },
-          // Delegation edges
-          {
-            selector: 'edge[edgeType="delegation"]',
-            style: {
-              'line-color': '#a855f7',
-              'target-arrow-color': '#a855f7',
-              'line-style': 'dashed',
-              'line-dash-pattern': [8, 4],
-              'opacity': 0.8,
-              'width': 2,
-            },
-          },
-          // Report edges
-          {
-            selector: 'edge[edgeType="report"]',
-            style: {
-              'line-color': '#10b981',
-              'target-arrow-color': '#10b981',
-              'opacity': 0.8,
-              'width': 2,
-            },
-          },
-          // Message edges
-          {
-            selector: 'edge[edgeType="message"]',
-            style: {
-              'line-color': '#22d3ee',
-              'target-arrow-color': '#22d3ee',
-              'line-style': 'dashed',
-              'line-dash-pattern': [6, 3],
-              'opacity': 0.7,
-              'width': 1.5,
-            },
-          },
-          // Mention edges
-          {
-            selector: 'edge[edgeType="mention"]',
-            style: {
-              'line-color': '#ef4444',
-              'target-arrow-color': '#ef4444',
-              'line-style': 'dashed',
-              'line-dash-pattern': [4, 4],
-              'opacity': 0.9,
-              'width': 2.5,
-            },
-          },
+          { selector: 'edge[edgeType="hierarchy"][?active]', style: { 'line-color': '#475569', 'target-arrow-color': '#475569', 'line-style': 'solid', 'opacity': 0.6, 'width': 1.5 } },
+          { selector: 'edge[edgeType="delegation"]', style: { 'line-color': '#a855f7', 'target-arrow-color': '#a855f7', 'line-style': 'dashed', 'line-dash-pattern': [8, 4], 'opacity': 0.8, 'width': 2 } },
+          { selector: 'edge[edgeType="report"]', style: { 'line-color': '#10b981', 'target-arrow-color': '#10b981', 'opacity': 0.8, 'width': 2 } },
+          { selector: 'edge[edgeType="message"]', style: { 'line-color': '#22d3ee', 'target-arrow-color': '#22d3ee', 'line-style': 'dashed', 'line-dash-pattern': [6, 3], 'opacity': 0.7, 'width': 1.5 } },
+          { selector: 'edge[edgeType="mention"]', style: { 'line-color': '#ef4444', 'target-arrow-color': '#ef4444', 'line-style': 'dashed', 'line-dash-pattern': [4, 4], 'opacity': 0.9, 'width': 2.5 } },
         ],
         layout: { name: 'preset' },
         minZoom: 0.3,
@@ -837,28 +973,30 @@ html, body {
 
       // Click handling
       this.cy.on('tap', 'node', function (evt) {
-        const id = evt.target.id();
-        StateStore.selectedAgentId = id;
+        var id = evt.target.id();
+        selectedAgentId = id;
         SidebarPanel.show(id);
       });
 
       this.cy.on('tap', function (evt) {
         if (evt.target === GraphRenderer.cy) {
-          StateStore.selectedAgentId = null;
+          selectedAgentId = null;
           SidebarPanel.clear();
         }
       });
 
-      // Start animations
       this.startAnimations();
     },
 
-    rebuild() {
+    rebuild: function () {
       if (!this.cy) return;
       this.cy.elements().remove();
 
-      StateStore.agents.forEach(agent => {
-        this.cy.add({
+      var sess = activeSession();
+      if (!sess) return;
+
+      sess.agents.forEach(function (agent) {
+        GraphRenderer.cy.add({
           group: 'nodes',
           data: {
             id: agent.id,
@@ -870,10 +1008,9 @@ html, body {
         });
       });
 
-      StateStore.edges.forEach(edge => {
-        // Only add if source and target exist
-        if (this.cy.getElementById(edge.source).length && this.cy.getElementById(edge.target).length) {
-          this.cy.add({
+      sess.edges.forEach(function (edge) {
+        if (GraphRenderer.cy.getElementById(edge.source).length && GraphRenderer.cy.getElementById(edge.target).length) {
+          GraphRenderer.cy.add({
             group: 'edges',
             data: {
               id: edge.id,
@@ -889,7 +1026,7 @@ html, body {
       this.runLayout();
     },
 
-    runLayout() {
+    runLayout: function () {
       if (!this.cy || this.cy.nodes().length === 0) return;
       this.cy.layout({
         name: 'dagre',
@@ -904,124 +1041,66 @@ html, body {
       }).run();
     },
 
-    addNode(agent) {
-      if (!this.cy) return;
-      this.cy.add({
-        group: 'nodes',
-        data: {
-          id: agent.id,
-          label: agent.label,
-          tier: agent.type,
-          status: agent.status,
-          department: agent.department,
-        },
-      });
-      // Re-layout after a short delay to batch additions
-      clearTimeout(this._layoutTimer);
-      this._layoutTimer = setTimeout(() => this.runLayout(), 200);
-    },
-
-    removeNode(id) {
-      if (!this.cy) return;
-      const node = this.cy.getElementById(id);
-      if (node.length) {
-        node.animate({ style: { opacity: 0 } }, { duration: 300, complete: () => node.remove() });
-      }
-    },
-
-    updateNode(agent) {
-      if (!this.cy) return;
-      const node = this.cy.getElementById(agent.id);
-      if (node.length) {
-        node.data('status', agent.status);
-        node.data('label', agent.label);
-      }
-    },
-
-    addEdge(edge) {
-      if (!this.cy) return;
-      if (!this.cy.getElementById(edge.source).length || !this.cy.getElementById(edge.target).length) return;
-      if (this.cy.getElementById(edge.id).length) return; // already exists
-      this.cy.add({
-        group: 'edges',
-        data: {
-          id: edge.id,
-          source: edge.source,
-          target: edge.target,
-          edgeType: edge.edgeType,
-          active: edge.active,
-        },
-      });
-    },
-
-    removeEdge(id) {
-      if (!this.cy) return;
-      const el = this.cy.getElementById(id);
-      if (el.length) el.remove();
-    },
-
-    // Edge dash animation
-    _animFrame: null,
-    _dashOffset: 0,
-    startAnimations() {
-      const animate = () => {
-        this._dashOffset += 0.5;
-        if (this.cy) {
-          this.cy.edges('[edgeType="delegation"], [edgeType="message"], [edgeType="mention"]').forEach(edge => {
-            const base = edge.data('edgeType') === 'mention' ? [4, 4] : [8, 4];
-            edge.style('line-dash-offset', -this._dashOffset);
+    startAnimations: function () {
+      var self = this;
+      var animate = function () {
+        self._dashOffset += 0.5;
+        if (self.cy) {
+          self.cy.edges('[edgeType="delegation"], [edgeType="message"], [edgeType="mention"]').forEach(function (edge) {
+            edge.style('line-dash-offset', -self._dashOffset);
           });
 
-          // Pulse glow for working nodes
-          const t = Date.now();
-          this.cy.nodes('[status="working"]').forEach(node => {
-            const glow = 2 + Math.sin(t / 400) * 1;
+          var t = Date.now();
+          self.cy.nodes('[status="working"]').forEach(function (node) {
+            var glow = 2 + Math.sin(t / 400) * 1;
             node.style('border-width', glow);
           });
-          this.cy.nodes('[status="in-meeting"]').forEach(node => {
-            const op = 0.4 + (Math.sin(t / 1000) + 1) * 0.3;
+          self.cy.nodes('[status="in-meeting"]').forEach(function (node) {
+            var op = 0.4 + (Math.sin(t / 1000) + 1) * 0.3;
             node.style('opacity', op);
           });
-          this.cy.nodes('[status="waiting-for-user"]').forEach(node => {
-            const op = 0.5 + (Math.sin(t / 1500) + 1) * 0.25;
+          self.cy.nodes('[status="waiting-for-user"]').forEach(function (node) {
+            var op = 0.5 + (Math.sin(t / 1500) + 1) * 0.25;
             node.style('opacity', op);
           });
-          this.cy.nodes('[status="spawning-workers"]').forEach(node => {
-            const c = Math.sin(t / 600) > 0 ? '#a855f7' : '#22d3ee';
+          self.cy.nodes('[status="spawning-workers"]').forEach(function (node) {
+            var c = Math.sin(t / 600) > 0 ? '#a855f7' : '#22d3ee';
             node.style('border-color', c);
           });
         }
-        this._animFrame = requestAnimationFrame(animate);
+        self._animFrame = requestAnimationFrame(animate);
       };
-      this._animFrame = requestAnimationFrame(animate);
+      self._animFrame = requestAnimationFrame(animate);
     },
   };
 
   // ====================================================================
-  // 4. SIDEBAR PANEL
+  // 5. SIDEBAR PANEL
   // ====================================================================
-  const SidebarPanel = {
-    show(agentId) {
-      const agent = StateStore.agents.get(agentId);
+  var SidebarPanel = {
+    show: function (agentId) {
+      var sess = activeSession();
+      if (!sess) { this.clear(); return; }
+      var agent = sess.agents.get(agentId);
       if (!agent) { this.clear(); return; }
 
       document.getElementById('sidebar-empty').style.display = 'none';
-      const el = document.getElementById('sidebar-content');
+      var el = document.getElementById('sidebar-content');
       el.style.display = 'block';
 
-      // Find children
-      const children = [];
-      StateStore.agents.forEach(a => {
+      // Children
+      var children = [];
+      sess.agents.forEach(function (a) {
         if (a.parentId === agentId) children.push(a);
       });
 
-      // Find related events
-      const recentEvents = StateStore.eventHistory
-        .filter(ev => (ev.agentId === agentId || ev.fromId === agentId || ev.toId === agentId))
+      // Recent events for this agent
+      var recentEvents = sess.eventHistory
+        .filter(function (ev) { return ev.agentId === agentId || ev.fromId === agentId || ev.toId === agentId; })
         .slice(-10)
         .reverse();
 
-      const tierIcon = agent.type === 'orchestrator' ? '&#x1F3AF;' : agent.type === 'leader' ? '&#x1F451;' : '&#x2699;&#xFE0F;';
+      var tierIcon = agent.type === 'orchestrator' ? '&#x1F3AF;' : agent.type === 'leader' ? '&#x1F451;' : '&#x2699;&#xFE0F;';
 
       el.innerHTML =
         '<div style="text-align:center;margin-bottom:8px;">' +
@@ -1039,52 +1118,52 @@ html, body {
           : '') +
         (children.length > 0
           ? '<h2 style="margin-top:12px;">Children</h2><ul class="children-list">' +
-            children.map(c => '<li>' + escHtml(c.label) + ' <span class="status-chip ' + c.status + '" style="font-size:10px;">' + c.status + '</span></li>').join('') +
+            children.map(function (c) { return '<li>' + escHtml(c.label) + ' <span class="status-chip ' + c.status + '" style="font-size:10px;">' + c.status + '</span></li>'; }).join('') +
             '</ul>'
           : '') +
         (recentEvents.length > 0
           ? '<h2 style="margin-top:12px;">Recent Activity</h2><div id="task-history">' +
-            recentEvents.map(ev => '<div class="history-item">' + summarizeEventShort(ev) + '</div>').join('') +
+            recentEvents.map(function (ev) { return '<div class="history-item">' + summarizeEventShort(ev) + '</div>'; }).join('') +
             '</div>'
           : '');
     },
 
-    clear() {
+    clear: function () {
       document.getElementById('sidebar-empty').style.display = 'block';
       document.getElementById('sidebar-content').style.display = 'none';
     },
   };
 
   // ====================================================================
-  // 5. EVENT LOG
+  // 6. EVENT LOG
   // ====================================================================
-  const EventLog = {
+  var EventLog = {
     el: null,
     pauseEl: null,
     autoScroll: true,
     maxEntries: 500,
 
-    init() {
+    init: function () {
       this.el = document.getElementById('log-entries');
       this.pauseEl = document.getElementById('log-pause');
-
-      this.el.addEventListener('scroll', () => {
-        const atBottom = this.el.scrollHeight - this.el.scrollTop - this.el.clientHeight < 30;
-        this.autoScroll = atBottom;
-        this.pauseEl.classList.toggle('visible', !atBottom);
+      var self = this;
+      this.el.addEventListener('scroll', function () {
+        var atBottom = self.el.scrollHeight - self.el.scrollTop - self.el.clientHeight < 30;
+        self.autoScroll = atBottom;
+        self.pauseEl.classList.toggle('visible', !atBottom);
       });
     },
 
-    append(ev) {
-      const row = document.createElement('div');
+    append: function (sessionId, displayName, ev) {
+      var row = document.createElement('div');
       row.className = 'log-entry';
 
-      const now = new Date();
-      const ts = pad2(now.getHours()) + ':' + pad2(now.getMinutes()) + ':' + pad2(now.getSeconds());
+      var now = new Date();
+      var ts = pad2(now.getHours()) + ':' + pad2(now.getMinutes()) + ':' + pad2(now.getSeconds());
 
-      let kindLabel = '';
-      let kindClass = '';
-      let message = '';
+      var kindLabel = '';
+      var kindClass = '';
+      var message = '';
 
       switch (ev.kind) {
         case 'agent_spawned':
@@ -1131,12 +1210,12 @@ html, body {
 
       row.innerHTML =
         '<span class="log-time">' + ts + '</span>' +
+        '<span class="log-session">' + escHtml(displayName) + '</span>' +
         '<span class="log-kind ' + kindClass + '">' + kindLabel + '</span>' +
         '<span class="log-msg">' + message + '</span>';
 
       this.el.appendChild(row);
 
-      // Prune old entries
       while (this.el.children.length > this.maxEntries) {
         this.el.removeChild(this.el.firstChild);
       }
@@ -1145,27 +1224,53 @@ html, body {
         this.el.scrollTop = this.el.scrollHeight;
       }
     },
+
+    appendSystem: function (displayName, message) {
+      var row = document.createElement('div');
+      row.className = 'log-entry';
+      var now = new Date();
+      var ts = pad2(now.getHours()) + ':' + pad2(now.getMinutes()) + ':' + pad2(now.getSeconds());
+      row.innerHTML =
+        '<span class="log-time">' + ts + '</span>' +
+        '<span class="log-session">' + escHtml(displayName) + '</span>' +
+        '<span class="log-kind session">SESSION</span>' +
+        '<span class="log-msg">' + escHtml(message) + '</span>';
+      this.el.appendChild(row);
+      if (this.autoScroll) this.el.scrollTop = this.el.scrollHeight;
+    },
   };
 
   // ====================================================================
-  // 6. STATUS BAR
+  // 7. STATUS BAR
   // ====================================================================
-  const StatusBar = {
-    update() {
-      const agentCount = StateStore.agents.size;
-      document.getElementById('badge-agents').textContent = agentCount + ' agent' + (agentCount !== 1 ? 's' : '');
+  var StatusBar = {
+    update: function () {
+      // Session count
+      var totalSessions = sessions.size;
+      var activeSessions = 0;
+      sessions.forEach(function (s) { if (s.isActive) activeSessions++; });
+      document.getElementById('badge-sessions').textContent = activeSessions + '/' + totalSessions + ' sessions';
 
-      const meeting = StateStore.meeting;
-      const meetingEl = document.getElementById('badge-meeting');
-      if (meeting) {
-        meetingEl.textContent = meeting.phase;
-        meetingEl.className = 'badge amber';
+      // Agent count + meeting + cost for active tab
+      var sess = activeSession();
+      if (sess) {
+        document.getElementById('badge-agents').textContent = sess.agents.size + ' agent' + (sess.agents.size !== 1 ? 's' : '');
+
+        if (sess.meeting) {
+          document.getElementById('badge-meeting').textContent = sess.meeting.phase;
+          document.getElementById('badge-meeting').className = 'badge amber';
+        } else {
+          document.getElementById('badge-meeting').textContent = 'No meeting';
+          document.getElementById('badge-meeting').className = 'badge purple';
+        }
+
+        document.getElementById('badge-cost').textContent = '$' + sess.totalCost.toFixed(4);
       } else {
-        meetingEl.textContent = 'No meeting';
-        meetingEl.className = 'badge purple';
+        document.getElementById('badge-agents').textContent = '0 agents';
+        document.getElementById('badge-meeting').textContent = 'No meeting';
+        document.getElementById('badge-meeting').className = 'badge purple';
+        document.getElementById('badge-cost').textContent = '$0.0000';
       }
-
-      document.getElementById('badge-cost').textContent = '$' + StateStore.totalCost.toFixed(4);
     },
   };
 
@@ -1199,14 +1304,11 @@ html, body {
   // ====================================================================
   // BOOT
   // ====================================================================
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', function () {
     GraphRenderer.init();
     EventLog.init();
     StatusBar.update();
     ConnectionManager.connect();
-
-    // Welcome log entry
-    EventLog.append({ kind: 'state_changed', agentId: 'dashboard', from: 'offline', to: 'connected' });
   });
 
 })();
