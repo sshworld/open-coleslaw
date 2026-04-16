@@ -2,51 +2,43 @@
 set -euo pipefail
 
 # Open Coleslaw — Session Start Hook
-# Injects plugin rules into every Claude Code session as additional context.
+# Injects the using-open-coleslaw skill content directly into every session.
+# Same pattern as superpowers: load the full skill at session start.
 
+SKILL_FILE="${CLAUDE_PLUGIN_ROOT}/skills/using-open-coleslaw/SKILL.md"
 RULES_FILE="${CLAUDE_PLUGIN_ROOT}/src/assets/rules.md"
-GUIDE_FILE="${CLAUDE_PLUGIN_ROOT}/src/assets/plugin-guide.md"
 
 CONTENT="<EXTREMELY_IMPORTANT>
-You have the open-coleslaw plugin installed.
+You have open-coleslaw installed.
 
-For ANY user request involving building, creating, designing, fixing, or modifying software:
+**Below is the full content of your 'open-coleslaw:using-open-coleslaw' skill — your guide to using open-coleslaw. For other skills, use the Skill tool:**
 
-1. FIRST: Invoke the Skill tool with 'open-coleslaw:meeting'
-2. The skill will tell you to dispatch the open-coleslaw:orchestrator agent
-3. The orchestrator agent manages the entire pipeline: meeting → PRD → plan → implement
-4. You NEVER call open-coleslaw MCP tools (start-meeting, execute-tasks, etc.) directly — the orchestrator does that
-
-If you think 'this is simple enough to just do directly' — STOP. Use open-coleslaw:meeting.
-
-The user installed this plugin so ALL work goes through the orchestrator's structured pipeline.
-</EXTREMELY_IMPORTANT>
-
+---
 "
 
-if [ -f "$RULES_FILE" ]; then
-  CONTENT="${CONTENT}$(cat "$RULES_FILE")"
+# Load the using-open-coleslaw skill content directly
+if [ -f "$SKILL_FILE" ]; then
+  CONTENT="${CONTENT}$(cat "$SKILL_FILE")"
 fi
 
-if [ -f "$GUIDE_FILE" ]; then
+# Append rules
+if [ -f "$RULES_FILE" ]; then
   CONTENT="${CONTENT}
 
 ---
 
-$(cat "$GUIDE_FILE")"
+$(cat "$RULES_FILE")"
 fi
 
-if [ -z "$CONTENT" ]; then
-  exit 0
-fi
+CONTENT="${CONTENT}
+</EXTREMELY_IMPORTANT>"
 
 # Escape for JSON
 ESCAPED=$(printf '%s' "$CONTENT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read())[1:-1])')
 
-# Escape the visible message too
+# Visible greeting
 SYS_MSG=$(printf '%s' "🥬 Open Coleslaw loaded — View Dashboard Live @ http://localhost:35143" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read())[1:-1])')
 
-# Output: additionalContext for Claude's context, systemMessage for user-visible display
 printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"%s"},"systemMessage":"%s"}\n' "$ESCAPED" "$SYS_MSG"
 
 exit 0
