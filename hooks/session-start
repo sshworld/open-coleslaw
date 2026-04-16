@@ -10,16 +10,16 @@ GUIDE_FILE="${CLAUDE_PLUGIN_ROOT}/src/assets/plugin-guide.md"
 CONTENT="<EXTREMELY_IMPORTANT>
 You have the open-coleslaw plugin installed.
 
-For ANY user request involving building, creating, designing, fixing, or modifying software — you MUST use the open-coleslaw:meeting skill FIRST. No exceptions.
+For ANY user request involving building, creating, designing, fixing, or modifying software:
 
-The workflow is ALWAYS:
-1. Invoke Skill tool with 'open-coleslaw:meeting'
-2. Follow the meeting → PRD → plan review → user approval → implement pipeline
-3. Never skip the meeting step. Never build directly without going through open-coleslaw.
+1. FIRST: Invoke the Skill tool with 'open-coleslaw:meeting'
+2. The skill will tell you to dispatch the open-coleslaw:orchestrator agent
+3. The orchestrator agent manages the entire pipeline: meeting → PRD → plan → implement
+4. You NEVER call open-coleslaw MCP tools (start-meeting, execute-tasks, etc.) directly — the orchestrator does that
 
-If you think 'this is simple enough to just do directly' — STOP. That thought means you are skipping the workflow. Use open-coleslaw:meeting.
+If you think 'this is simple enough to just do directly' — STOP. Use open-coleslaw:meeting.
 
-The user installed this plugin specifically so that ALL work goes through the structured meeting pipeline. Respect their choice.
+The user installed this plugin so ALL work goes through the orchestrator's structured pipeline.
 </EXTREMELY_IMPORTANT>
 
 "
