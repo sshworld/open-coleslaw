@@ -4,7 +4,7 @@ import { MeetingProtocol } from '../../src/meeting/protocol.js';
 describe('MeetingProtocol', () => {
   const meetingId = 'meeting-001';
   const agenda = ['Design the API', 'Review dependencies', 'Plan testing strategy'];
-  const participants = ['arch-leader', 'eng-leader', 'qa-leader'];
+  const participants = ['architect', 'engineer', 'qa'];
   let protocol: MeetingProtocol;
 
   beforeEach(() => {
@@ -37,11 +37,11 @@ describe('MeetingProtocol', () => {
 
   describe('getNextSpeaker', () => {
     it('cycles through participants round-robin', () => {
-      expect(protocol.getNextSpeaker()).toBe('arch-leader');
-      expect(protocol.getNextSpeaker()).toBe('eng-leader');
-      expect(protocol.getNextSpeaker()).toBe('qa-leader');
+      expect(protocol.getNextSpeaker()).toBe('architect');
+      expect(protocol.getNextSpeaker()).toBe('engineer');
+      expect(protocol.getNextSpeaker()).toBe('qa');
       // Wraps around
-      expect(protocol.getNextSpeaker()).toBe('arch-leader');
+      expect(protocol.getNextSpeaker()).toBe('architect');
     });
 
     it('returns null if there are no participants', () => {
@@ -59,12 +59,12 @@ describe('MeetingProtocol', () => {
 
     it('resets speaker index to 0', () => {
       // Advance through some speakers
-      protocol.getNextSpeaker(); // arch-leader (index becomes 1)
-      protocol.getNextSpeaker(); // eng-leader (index becomes 2)
+      protocol.getNextSpeaker(); // architect (index becomes 1)
+      protocol.getNextSpeaker(); // engineer (index becomes 2)
 
       // Advance round resets speaker
       protocol.advanceRound();
-      expect(protocol.getNextSpeaker()).toBe('arch-leader');
+      expect(protocol.getNextSpeaker()).toBe('architect');
     });
 
     it('increments round multiple times', () => {
@@ -91,7 +91,7 @@ describe('MeetingProtocol', () => {
       protocol.advanceAgendaItem();
 
       // Round should be reset to 1 and speaker to first
-      expect(protocol.getNextSpeaker()).toBe('arch-leader');
+      expect(protocol.getNextSpeaker()).toBe('architect');
     });
 
     it('returns null when no more items', () => {
@@ -128,13 +128,13 @@ describe('MeetingProtocol', () => {
 
   describe('formatSpeakerContext', () => {
     it('includes the current agenda item in formatted context', () => {
-      const context = protocol.formatSpeakerContext('arch-leader', []);
+      const context = protocol.formatSpeakerContext('architect', []);
       expect(context).toContain('Design the API');
       expect(context).toContain('Round');
     });
 
     it('indicates no prior discussion when transcript is empty', () => {
-      const context = protocol.formatSpeakerContext('arch-leader', []);
+      const context = protocol.formatSpeakerContext('architect', []);
       expect(context).toContain('No prior discussion');
     });
 
@@ -143,8 +143,8 @@ describe('MeetingProtocol', () => {
         {
           id: 1,
           meetingId: 'meeting-001',
-          speakerId: 'eng-leader',
-          speakerRole: 'eng-leader',
+          speakerId: 'engineer',
+          speakerRole: 'engineer',
           agendaItemIndex: 0,
           roundNumber: 1,
           content: 'We should use REST.',
@@ -152,16 +152,16 @@ describe('MeetingProtocol', () => {
           createdAt: Date.now(),
         },
       ];
-      const context = protocol.formatSpeakerContext('arch-leader', transcript);
+      const context = protocol.formatSpeakerContext('architect', transcript);
       expect(context).toContain('We should use REST.');
-      expect(context).toContain('eng-leader');
+      expect(context).toContain('engineer');
     });
 
     it('returns message about no more items when agenda is exhausted', () => {
       protocol.advanceAgendaItem();
       protocol.advanceAgendaItem();
       protocol.advanceAgendaItem();
-      const context = protocol.formatSpeakerContext('arch-leader', []);
+      const context = protocol.formatSpeakerContext('architect', []);
       expect(context).toContain('no more agenda items');
     });
   });

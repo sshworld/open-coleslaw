@@ -5,7 +5,7 @@ describe('getDepartment', () => {
   it('returns architecture department with correct leader role, worker types, and tools', () => {
     const arch = getDepartment('architecture');
     expect(arch.name).toBe('architecture');
-    expect(arch.leaderRole).toBe('arch-leader');
+    expect(arch.leaderRole).toBe('architect');
     expect(arch.workerTypes).toEqual(['schema-designer', 'api-designer', 'dependency-analyzer']);
     expect(arch.allowedTools).toEqual(['Read', 'Grep', 'Glob']);
   });
@@ -13,7 +13,7 @@ describe('getDepartment', () => {
   it('returns engineering department with Write/Edit/Bash tools', () => {
     const eng = getDepartment('engineering');
     expect(eng.name).toBe('engineering');
-    expect(eng.leaderRole).toBe('eng-leader');
+    expect(eng.leaderRole).toBe('engineer');
     expect(eng.allowedTools).toContain('Write');
     expect(eng.allowedTools).toContain('Edit');
     expect(eng.allowedTools).toContain('Bash');
@@ -22,20 +22,20 @@ describe('getDepartment', () => {
   it('returns qa department', () => {
     const qa = getDepartment('qa');
     expect(qa.name).toBe('qa');
-    expect(qa.leaderRole).toBe('qa-leader');
+    expect(qa.leaderRole).toBe('qa');
     expect(qa.allowedTools).toContain('Bash');
   });
 
   it('returns product department', () => {
     const product = getDepartment('product');
     expect(product.name).toBe('product');
-    expect(product.leaderRole).toBe('pm-leader');
+    expect(product.leaderRole).toBe('product-manager');
   });
 
   it('returns research department', () => {
     const research = getDepartment('research');
     expect(research.name).toBe('research');
-    expect(research.leaderRole).toBe('research-leader');
+    expect(research.leaderRole).toBe('researcher');
     expect(research.allowedTools).toContain('WebSearch');
   });
 
@@ -59,24 +59,24 @@ describe('getAllDepartments', () => {
 });
 
 describe('getDepartmentForRole', () => {
-  it('resolves arch-leader to architecture', () => {
-    expect(getDepartmentForRole('arch-leader')).toBe('architecture');
+  it('resolves architect to architecture', () => {
+    expect(getDepartmentForRole('architect')).toBe('architecture');
   });
 
-  it('resolves eng-leader to engineering', () => {
-    expect(getDepartmentForRole('eng-leader')).toBe('engineering');
+  it('resolves engineer to engineering', () => {
+    expect(getDepartmentForRole('engineer')).toBe('engineering');
   });
 
   it('resolves qa-leader to qa', () => {
-    expect(getDepartmentForRole('qa-leader')).toBe('qa');
+    expect(getDepartmentForRole('qa')).toBe('qa');
   });
 
   it('resolves pm-leader to product', () => {
-    expect(getDepartmentForRole('pm-leader')).toBe('product');
+    expect(getDepartmentForRole('product-manager')).toBe('product');
   });
 
-  it('resolves research-leader to research', () => {
-    expect(getDepartmentForRole('research-leader')).toBe('research');
+  it('resolves researchitect to research', () => {
+    expect(getDepartmentForRole('researcher')).toBe('research');
   });
 
   it('throws for unknown role', () => {

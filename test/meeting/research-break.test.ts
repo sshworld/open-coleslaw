@@ -69,7 +69,7 @@ describe('detectResearchBreak', () => {
 describe('formatResearchResult', () => {
   it('returns formatted markdown with request details and result', () => {
     const request: ResearchBreakRequest = {
-      requestingLeader: 'arch-leader',
+      requestingLeader: 'architect',
       question: 'What is the API rate limit?',
       estimatedDuration: 'quick',
     };
@@ -78,19 +78,19 @@ describe('formatResearchResult', () => {
 
     expect(formatted).toContain('---');
     expect(formatted).toContain('Research Break Result');
-    expect(formatted).toContain('arch-leader');
+    expect(formatted).toContain('architect');
     expect(formatted).toContain('What is the API rate limit?');
     expect(formatted).toContain('The rate limit is 100 requests per minute.');
   });
 
   it('includes the requesting leader name', () => {
     const request: ResearchBreakRequest = {
-      requestingLeader: 'eng-leader',
+      requestingLeader: 'engineer',
       question: 'How does the cache work?',
       estimatedDuration: 'quick',
     };
 
     const formatted = formatResearchResult(request, 'It uses LRU with a 5min TTL.');
-    expect(formatted).toContain('eng-leader');
+    expect(formatted).toContain('engineer');
   });
 });

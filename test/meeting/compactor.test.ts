@@ -81,19 +81,19 @@ describe('Compactor', () => {
     // Item 1: "implement" + "feature" + "critical" => engineering, critical
     const item1 = result.find((i) => i.id === 'item-1')!;
     expect(item1.assignedDepartment).toBe('engineering');
-    expect(item1.assignedRole).toBe('eng-leader');
+    expect(item1.assignedRole).toBe('engineer');
     expect(item1.priority).toBe('critical');
 
     // Item 2: "schema" + "design" + "architecture" => architecture, high
     const item2 = result.find((i) => i.id === 'item-2')!;
     expect(item2.assignedDepartment).toBe('architecture');
-    expect(item2.assignedRole).toBe('arch-leader');
+    expect(item2.assignedRole).toBe('architect');
     expect(item2.priority).toBe('high');
 
     // Item 3: "test" + "quality" + "coverage" => qa
     const item3 = result.find((i) => i.id === 'item-3')!;
     expect(item3.assignedDepartment).toBe('qa');
-    expect(item3.assignedRole).toBe('qa-leader');
+    expect(item3.assignedRole).toBe('qa');
   });
 
   it('extracts action items from content when no structured items exist', async () => {

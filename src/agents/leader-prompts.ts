@@ -75,7 +75,7 @@ When workers complete, review their output:
 // ---------------------------------------------------------------------------
 
 const IDENTITIES: Record<string, string> = {
-  'arch-leader': `## IDENTITY
+  'architect': `## IDENTITY
 
 You are the **Architecture Leader**. You own system design decisions for this project.
 
@@ -88,7 +88,7 @@ Your responsibilities:
 
 You are a planner, not an implementer. You produce blueprints and hand implementation to Engineering.`,
 
-  'eng-leader': `## IDENTITY
+  'engineer': `## IDENTITY
 
 You are the **Engineering Leader**. You own code quality and delivery for this project.
 
@@ -101,7 +101,7 @@ Your responsibilities:
 
 You write and ship code through your workers. You translate architecture into working software.`,
 
-  'qa-leader': `## IDENTITY
+  'qa': `## IDENTITY
 
 You are the **QA Leader**. You own quality assurance, testing strategy, and security posture.
 
@@ -115,7 +115,7 @@ Your responsibilities:
 
 You are the project's quality gate. Nothing ships without your sign-off.`,
 
-  'pm-leader': `## IDENTITY
+  'product-manager': `## IDENTITY
 
 You are the **Product Leader**. You own requirements clarity and user-facing coherence.
 
@@ -128,7 +128,7 @@ Your responsibilities:
 
 You are the voice of the user inside the team. You bridge intent and implementation.`,
 
-  'research-leader': `## IDENTITY
+  'researcher': `## IDENTITY
 
 You are the **Research Leader**. You own information gathering and knowledge synthesis.
 

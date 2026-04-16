@@ -67,26 +67,34 @@ Prompt → Orchestrator → Meeting → Minutes → Plan Mode → Approve → Im
 ## The Agent Hierarchy
 
 ```
-        ┌─────────────────┐
-        │   Orchestrator   │  ← Your proxy (NOT a CEO)
-        │   (claude-opus)  │    Decides, but asks you
-        └────────┬────────┘    for important calls
-     ┌───────────┼───────────┐
-     ▼           ▼           ▼
-┌─────────┐ ┌─────────┐ ┌─────────┐
-│  Arch   │ │  Eng    │ │  QA     │  ← Leaders meet & discuss
-│ Leader  │ │ Leader  │ │ Leader  │    Discuss via Agent tool
-└────┬────┘ └────┬────┘ └────┬────┘
-     └───────────┼───────────┘
-                 ▼
-         ┌──────────────┐
-         │ Implementer  │  ← Writes code after plan approval
-         └──────────────┘
+         ┌─────────────────┐
+         │   Orchestrator   │  ← Your proxy
+         │   (claude-opus)  │
+         └────────┬────────┘
+    ┌─────────────┼─────────────┐
+    ▼             ▼             ▼
+┌──────────┐ ┌──────────┐ ┌──────────┐
+│ Architect│ │ Engineer │ │    QA    │  ← Specialists discuss
+└──────────┘ └──────────┘ └──────────┘
+                  │
+            Plan Mode → User approves
+                  │
+    ┌─────────────┼─────────────┐
+    ▼             ▼             ▼
+┌────────┐  ┌────────┐  ┌────────┐
+│Worker 1│  │Worker 2│  │Worker N│     ← Parallel implementation
+└────────┘  └────────┘  └────────┘
+                  │
+              Verify
+            /        \
+         Pass        Fail → Re-meeting
+          ↓
+    Done (or next MVP)
 ```
 
-**5 Departments**: Architecture, Engineering, QA, Product, Research
+**5 Specialists**: Architect, Engineer, QA, Product Manager, Researcher
 
-Each leader autonomously decides how many workers to hire based on task complexity.
+Work is done in **MVP cycles**: meeting → plan → workers → verify → repeat.
 
 ## What's Inside
 
@@ -115,13 +123,13 @@ Each leader autonomously decides how many workers to hire based on task complexi
 
 | Agent | Role |
 |-------|------|
-| `orchestrator` | Your proxy — manages the full pipeline |
-| `arch-leader` | System design, API contracts, schemas |
-| `eng-leader` | Implementation feasibility, code quality |
-| `qa-leader` | Testing strategy, security, edge cases |
-| `pm-leader` | Requirements, user stories, prioritization |
-| `research-leader` | Codebase exploration, prior art |
-| `implementer` | Writes code after plan approval |
+| `orchestrator` | Your proxy — manages the full MVP cycle |
+| `architect` | System design, API contracts, schemas |
+| `engineer` | Implementation feasibility, code quality |
+| `qa` | Testing strategy, security, edge cases |
+| `product-manager` | Requirements, user stories, prioritization |
+| `researcher` | Codebase exploration, prior art |
+| `worker` | Writes code (N workers dispatched in parallel) |
 
 ### 7 Skills
 

@@ -30,11 +30,11 @@ When the user asks you to build, create, fix, design, or modify anything:
    ```
 
 2. **The orchestrator dispatches leader agents** as needed:
-   - `open-coleslaw:arch-leader` -- system design, API contracts, schemas
-   - `open-coleslaw:eng-leader` -- implementation feasibility, code quality, tech debt
-   - `open-coleslaw:qa-leader` -- testing strategy, security, edge cases
-   - `open-coleslaw:pm-leader` -- requirements clarity, user stories, acceptance criteria
-   - `open-coleslaw:research-leader` -- codebase exploration, prior art, feasibility
+   - `open-coleslaw:architect` -- system design, API contracts, schemas
+   - `open-coleslaw:engineer` -- implementation feasibility, code quality, tech debt
+   - `open-coleslaw:qa` -- testing strategy, security, edge cases
+   - `open-coleslaw:product-manager` -- requirements clarity, user stories, acceptance criteria
+   - `open-coleslaw:researcher` -- codebase exploration, prior art, feasibility
 
 3. **The orchestrator uses MCP tools** for meeting management:
    - `start-meeting`, `add-transcript`, `generate-minutes` for the meeting phase
@@ -46,7 +46,7 @@ When the user asks you to build, create, fix, design, or modify anything:
    - Uses ExitPlanMode to present for your approval
 
 5. **You review the plan in Plan Mode UI:**
-   - Approve → orchestrator dispatches `open-coleslaw:implementer` agents
+   - Approve → orchestrator dispatches `open-coleslaw:worker` agents
    - Request changes → orchestrator adjusts or chains a follow-up meeting
    - Reject → drop the plan
 
@@ -70,15 +70,25 @@ All work flows through the Agent tool. The hierarchy:
 ```
 You (Claude Code)
   └── Agent: open-coleslaw:orchestrator
-        ├── Agent: open-coleslaw:arch-leader
-        ├── Agent: open-coleslaw:eng-leader
-        ├── Agent: open-coleslaw:qa-leader
-        ├── Agent: open-coleslaw:pm-leader
-        ├── Agent: open-coleslaw:research-leader
-        └── Agent: open-coleslaw:implementer (after approval)
+        │
+        ├── Meeting Phase:
+        │   ├── Agent: open-coleslaw:architect
+        │   ├── Agent: open-coleslaw:engineer
+        │   ├── Agent: open-coleslaw:qa
+        │   ├── Agent: open-coleslaw:product-manager
+        │   └── Agent: open-coleslaw:researcher
+        │
+        ├── Plan Mode → User approves
+        │
+        ├── Implementation Phase:
+        │   ├── Agent: open-coleslaw:worker (task 1)
+        │   ├── Agent: open-coleslaw:worker (task 2)
+        │   └── Agent: open-coleslaw:worker (task N)
+        │
+        └── Verify → Pass? Done / Fail? → Re-meeting
 ```
 
-You only dispatch the orchestrator. The orchestrator dispatches everything else.
+You only dispatch the orchestrator. It manages the full MVP cycle.
 
 ## Dashboard
 

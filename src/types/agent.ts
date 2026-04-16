@@ -18,11 +18,11 @@ export type Department =
   | 'research';
 
 export type LeaderRole =
-  | 'arch-leader'
-  | 'eng-leader'
-  | 'qa-leader'
-  | 'pm-leader'
-  | 'research-leader';
+  | 'architect'
+  | 'engineer'
+  | 'qa'
+  | 'product-manager'
+  | 'researcher';
 
 export type WorkerType =
   | 'schema-designer'

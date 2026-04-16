@@ -1,5 +1,5 @@
 ---
-name: qa-leader
+name: qa
 description: |
   QA department leader for open-coleslaw meetings. Defines testing strategy,
   identifies security concerns, edge cases, and quality gates.

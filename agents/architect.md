@@ -1,5 +1,5 @@
 ---
-name: arch-leader
+name: architect
 description: |
   Architecture department leader for open-coleslaw meetings. Provides system design, 
   API contracts, database schema, and architectural trade-off analysis.

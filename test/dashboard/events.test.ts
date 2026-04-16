@@ -75,12 +75,12 @@ describe('summarizeEvent', () => {
       agentId: 'a1',
       agentType: 'leader',
       parentId: null,
-      label: 'eng-leader',
+      label: 'engineer',
       department: 'engineering',
     };
     const summary = summarizeEvent(event);
     expect(summary).toContain('[SPAWN]');
-    expect(summary).toContain('eng-leader');
+    expect(summary).toContain('engineer');
     expect(summary).toContain('engineering');
   });
 

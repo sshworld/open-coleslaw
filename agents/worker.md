@@ -1,7 +1,7 @@
 ---
-name: implementer
+name: worker
 description: |
-  Implementation agent for open-coleslaw. Writes code based on approved meeting plans.
+  Worker agent for open-coleslaw. Writes code based on approved meeting plans.
   Has full access to Read, Write, Edit, Bash, Grep, Glob tools.
   Dispatched by the orchestrator after a plan is approved by the user.
 model: sonnet

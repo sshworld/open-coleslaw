@@ -1,5 +1,5 @@
 ---
-name: pm-leader
+name: product-manager
 description: |
   Product department leader for open-coleslaw meetings. Ensures requirements clarity,
   writes user stories, defines acceptance criteria, and prioritizes work.

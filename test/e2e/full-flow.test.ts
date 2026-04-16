@@ -62,13 +62,13 @@ describe('E2E: meeting data flow', () => {
     // 2. Add transcripts (simulating leader agent responses via MCP tool)
     const runner = new MeetingRunner(result.meetingId);
 
-    runner.addTranscript('arch-leader', 0, 1,
+    runner.addTranscript('architect', 0, 1,
       'From an architecture perspective, REST is simpler but GraphQL gives more flexibility. I recommend REST for MVP.');
-    runner.addTranscript('eng-leader', 0, 1,
+    runner.addTranscript('engineer', 0, 1,
       'Agreed on REST for MVP. We should implement OpenAPI spec for documentation.');
-    runner.addTranscript('arch-leader', 1, 1,
+    runner.addTranscript('architect', 1, 1,
       'For auth, JWT with refresh tokens is the standard approach. We need to decide on session storage.');
-    runner.addTranscript('eng-leader', 1, 1,
+    runner.addTranscript('engineer', 1, 1,
       'JWT sounds good. Redis for session storage. Must implement rate limiting.');
 
     // 3. Generate minutes

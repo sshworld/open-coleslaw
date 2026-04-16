@@ -10,13 +10,13 @@ Call `get-agent-tree` to get the full agent hierarchy tree.
 Present it visually:
 ```
 Orchestrator (proxy)
-├── arch-leader [architecture] — status
+├── architect [architecture] — status
 │   ├── W1: schema-designer — task description
 │   └── W2: api-designer — task description
-├── eng-leader [engineering] — status
+├── engineer [engineering] — status
 │   ├── W3: feature-dev — task description
 │   └── W4: test-writer — task description
-└── qa-leader [qa] — status
+└── qa [qa] — status
     └── W5: test-runner — task description
 ```
 

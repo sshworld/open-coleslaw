@@ -97,11 +97,11 @@ function detectPriority(text: string): ActionItem['priority'] {
 }
 
 const LEADER_ROLE_FOR_DEPT: Record<Department, string> = {
-  architecture: 'arch-leader',
-  engineering: 'eng-leader',
-  qa: 'qa-leader',
-  product: 'pm-leader',
-  research: 'research-leader',
+  architecture: 'architect',
+  engineering: 'engineer',
+  qa: 'qa',
+  product: 'product-manager',
+  research: 'researcher',
 };
 
 // ---------------------------------------------------------------------------

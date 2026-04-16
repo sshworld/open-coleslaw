@@ -1,5 +1,5 @@
 ---
-name: research-leader
+name: researchitect
 description: |
   Research department leader for open-coleslaw meetings. Explores codebase, gathers
   prior art, runs benchmarks, and provides evidence-based input for decisions.

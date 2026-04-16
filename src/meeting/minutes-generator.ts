@@ -185,7 +185,7 @@ export class MinutesGenerator {
           title: `Action ${actionCounter}: ${meeting.agenda[i]}`,
           description: actionText,
           assignedDepartment: 'engineering', // default; compactor refines this
-          assignedRole: 'eng-leader',
+          assignedRole: 'engineer',
           priority: 'medium',
           dependencies: [],
           acceptanceCriteria: [],

@@ -1,5 +1,5 @@
 ---
-name: eng-leader
+name: engineer
 description: |
   Engineering department leader for open-coleslaw meetings. Evaluates implementation
   feasibility, code quality, tech debt, and delivery planning.

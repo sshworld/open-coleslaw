@@ -29,7 +29,7 @@ describe('createAgentConfig', () => {
     it('returns config with leader-tier settings and department tools', () => {
       const config = createAgentConfig({
         tier: 'leader',
-        role: 'eng-leader',
+        role: 'engineer',
         department: 'engineering',
       });
       expect(config.model).toBe('claude-sonnet-4-6');
@@ -92,7 +92,7 @@ describe('createAgentConfig', () => {
     it('does not override research leaders', () => {
       const config = createAgentConfig({
         tier: 'leader',
-        role: 'research-leader',
+        role: 'researcher',
         department: 'research',
       });
       expect(config.model).toBe('claude-sonnet-4-6');

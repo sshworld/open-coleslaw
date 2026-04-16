@@ -18,7 +18,7 @@ const DEPARTMENT_REGISTRY: ReadonlyMap<Department, DepartmentInfo> = new Map<Dep
       description:
         'Responsible for system design, schema definitions, API surface design, and dependency analysis. ' +
         'The architecture department plans before code is written — it produces blueprints, not implementations.',
-      leaderRole: 'arch-leader',
+      leaderRole: 'architect',
       workerTypes: ['schema-designer', 'api-designer', 'dependency-analyzer'],
       allowedTools: DEPARTMENT_TOOLS.architecture,
     },
@@ -30,7 +30,7 @@ const DEPARTMENT_REGISTRY: ReadonlyMap<Department, DepartmentInfo> = new Map<Dep
       description:
         'Responsible for writing, modifying, and refactoring production code. ' +
         'Engineering owns feature development, bug fixes, and code quality improvements.',
-      leaderRole: 'eng-leader',
+      leaderRole: 'engineer',
       workerTypes: ['feature-dev', 'bug-fixer', 'refactorer'],
       allowedTools: DEPARTMENT_TOOLS.engineering,
     },
@@ -42,7 +42,7 @@ const DEPARTMENT_REGISTRY: ReadonlyMap<Department, DepartmentInfo> = new Map<Dep
       description:
         'Responsible for test creation, test execution, security auditing, and performance testing. ' +
         'QA ensures deliverables meet acceptance criteria and do not introduce regressions.',
-      leaderRole: 'qa-leader',
+      leaderRole: 'qa',
       workerTypes: ['test-writer', 'test-runner', 'security-auditor', 'perf-tester'],
       allowedTools: DEPARTMENT_TOOLS.qa,
     },
@@ -54,7 +54,7 @@ const DEPARTMENT_REGISTRY: ReadonlyMap<Department, DepartmentInfo> = new Map<Dep
       description:
         'Responsible for requirements analysis, user-flow mapping, and stakeholder alignment. ' +
         'Product translates user intent into well-scoped, actionable requirements for other departments.',
-      leaderRole: 'pm-leader',
+      leaderRole: 'product-manager',
       workerTypes: ['requirements-analyzer', 'user-flow-mapper'],
       allowedTools: DEPARTMENT_TOOLS.product,
     },
@@ -66,7 +66,7 @@ const DEPARTMENT_REGISTRY: ReadonlyMap<Department, DepartmentInfo> = new Map<Dep
       description:
         'Responsible for codebase exploration, documentation search, benchmarking, and knowledge gathering. ' +
         'Research produces facts and context that inform decisions made by other departments.',
-      leaderRole: 'research-leader',
+      leaderRole: 'researcher',
       workerTypes: ['code-explorer', 'doc-searcher', 'benchmark-runner'],
       allowedTools: DEPARTMENT_TOOLS.research,
     },
