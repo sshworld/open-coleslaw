@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "coleslaw": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "open-coleslaw"]
+    }
+  }
+}
