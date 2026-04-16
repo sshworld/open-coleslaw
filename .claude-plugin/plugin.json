@@ -1,0 +1,21 @@
+{
+  "name": "open-coleslaw",
+  "description": "Multi-agent orchestrator for Claude Code. Like coleslaw — just scoop and eat. Your AI team is already hired.",
+  "version": "0.1.0",
+  "author": {
+    "name": "sshworld",
+    "email": "ssh97540@gmail.com"
+  },
+  "homepage": "https://github.com/sshworld/open-coleslaw",
+  "repository": "https://github.com/sshworld/open-coleslaw",
+  "license": "MIT",
+  "keywords": [
+    "multi-agent",
+    "orchestrator",
+    "meetings",
+    "prd",
+    "dashboard",
+    "hierarchy",
+    "autonomous"
+  ]
+}

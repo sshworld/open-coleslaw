@@ -1,0 +1,55 @@
+{
+  "meetingTypes": {
+    "design-review": {
+      "description": "Review system or feature design",
+      "defaultDepartments": ["architecture", "engineering"],
+      "defaultAgenda": [
+        "Review requirements",
+        "Evaluate design options",
+        "Decide on approach"
+      ],
+      "maxRoundsPerItem": 3
+    },
+    "code-review": {
+      "description": "Review code changes for quality, correctness, and conventions",
+      "defaultDepartments": ["engineering", "qa"],
+      "defaultAgenda": [
+        "Review changed files and diffs",
+        "Check correctness and edge cases",
+        "Assess test coverage and style compliance"
+      ],
+      "maxRoundsPerItem": 2
+    },
+    "sprint-planning": {
+      "description": "Plan work items for the upcoming sprint",
+      "defaultDepartments": ["product", "engineering", "architecture"],
+      "defaultAgenda": [
+        "Review backlog and priorities",
+        "Estimate effort for candidate items",
+        "Commit to sprint scope"
+      ],
+      "maxRoundsPerItem": 3
+    },
+    "bug-triage": {
+      "description": "Triage and prioritize reported bugs",
+      "defaultDepartments": ["engineering", "qa", "product"],
+      "defaultAgenda": [
+        "Review reported bugs",
+        "Assess severity and impact",
+        "Assign owners and priorities"
+      ],
+      "maxRoundsPerItem": 2
+    },
+    "feature-kickoff": {
+      "description": "Kick off a new feature with cross-department alignment",
+      "defaultDepartments": ["product", "architecture", "engineering", "qa"],
+      "defaultAgenda": [
+        "Present feature requirements and user stories",
+        "Discuss architectural approach",
+        "Define implementation plan and milestones",
+        "Establish acceptance criteria and test strategy"
+      ],
+      "maxRoundsPerItem": 3
+    }
+  }
+}

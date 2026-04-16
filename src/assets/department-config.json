@@ -1,0 +1,34 @@
+{
+  "departments": {
+    "architecture": {
+      "leader": "arch-leader",
+      "description": "System design, API contracts, DB schema",
+      "workers": ["schema-designer", "api-designer", "dependency-analyzer"],
+      "tools": ["Read", "Grep", "Glob"]
+    },
+    "engineering": {
+      "leader": "eng-leader",
+      "description": "Implementation, code quality, feature development",
+      "workers": ["feature-dev", "bug-fixer", "refactorer"],
+      "tools": ["Read", "Grep", "Glob", "Write", "Edit", "Bash"]
+    },
+    "qa": {
+      "leader": "qa-leader",
+      "description": "Testing, security auditing, performance testing",
+      "workers": ["test-writer", "test-runner", "security-auditor", "perf-tester"],
+      "tools": ["Read", "Grep", "Glob", "Bash"]
+    },
+    "product": {
+      "leader": "pm-leader",
+      "description": "Requirements analysis, user stories, stakeholder alignment",
+      "workers": ["requirements-analyzer", "user-flow-mapper"],
+      "tools": ["Read"]
+    },
+    "research": {
+      "leader": "research-leader",
+      "description": "Codebase exploration, documentation search, benchmarking",
+      "workers": ["code-explorer", "doc-searcher", "benchmark-runner"],
+      "tools": ["Read", "Grep", "Glob", "WebSearch"]
+    }
+  }
+}

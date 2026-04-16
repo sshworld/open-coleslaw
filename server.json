@@ -1,0 +1,14 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "name": "open-coleslaw",
+  "title": "Open Coleslaw — Multi-Agent Orchestrator",
+  "description": "Hierarchical multi-agent orchestration plugin for Claude Code. Like coleslaw — it's already prepared, just scoop and eat.",
+  "version": "0.1.0",
+  "locals": [
+    {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/index.js"]
+    }
+  ]
+}

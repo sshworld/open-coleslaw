@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Open Coleslaw — Session Start Hook
+# Injects plugin rules into every Claude Code session as additional context.
+
+RULES_FILE="${CLAUDE_PLUGIN_ROOT}/src/assets/rules.md"
+GUIDE_FILE="${CLAUDE_PLUGIN_ROOT}/src/assets/plugin-guide.md"
+
+CONTENT=""
+
+if [ -f "$RULES_FILE" ]; then
+  CONTENT=$(cat "$RULES_FILE")
+fi
+
+if [ -f "$GUIDE_FILE" ]; then
+  CONTENT="${CONTENT}
+
+---
+
+$(cat "$GUIDE_FILE")"
+fi
+
+if [ -z "$CONTENT" ]; then
+  exit 0
+fi
+
+# Escape for JSON
+ESCAPED=$(printf '%s' "$CONTENT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read())[1:-1])')
+
+# Output in Claude Code hook format
+printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"%s"}}\n' "$ESCAPED"
+
+exit 0

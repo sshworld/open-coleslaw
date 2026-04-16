@@ -1,0 +1,15 @@
+{
+  "name": "sshworld",
+  "owner": {
+    "name": "sshworld",
+    "email": "ssh97540@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "open-coleslaw",
+      "description": "Multi-agent orchestrator for Claude Code. Like coleslaw — just scoop and eat.",
+      "version": "0.1.0",
+      "source": "./"
+    }
+  ]
+}

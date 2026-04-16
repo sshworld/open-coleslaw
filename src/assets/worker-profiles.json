@@ -1,0 +1,106 @@
+{
+  "workers": {
+    "schema-designer": {
+      "description": "Designs database schemas and data models",
+      "department": "architecture",
+      "defaultTools": ["Read", "Grep", "Glob"],
+      "focusAreas": ["database", "schema", "migration", "ORM"]
+    },
+    "api-designer": {
+      "description": "Designs API surfaces, REST endpoints, RPC methods, and function signatures",
+      "department": "architecture",
+      "defaultTools": ["Read", "Grep", "Glob"],
+      "focusAreas": ["api", "endpoints", "contracts", "interfaces", "OpenAPI"]
+    },
+    "dependency-analyzer": {
+      "description": "Analyses project dependencies and module coupling",
+      "department": "architecture",
+      "defaultTools": ["Read", "Grep", "Glob"],
+      "focusAreas": ["dependencies", "coupling", "circular-deps", "upgrades"]
+    },
+    "feature-dev": {
+      "description": "Implements new features by writing production code",
+      "department": "engineering",
+      "defaultTools": ["Read", "Grep", "Glob", "Write", "Edit", "Bash"],
+      "focusAreas": ["implementation", "feature", "code", "integration"]
+    },
+    "bug-fixer": {
+      "description": "Diagnoses and fixes bugs with minimal correct patches",
+      "department": "engineering",
+      "defaultTools": ["Read", "Grep", "Glob", "Write", "Edit", "Bash"],
+      "focusAreas": ["bugs", "debugging", "root-cause", "regression"]
+    },
+    "refactorer": {
+      "description": "Improves existing code without changing behaviour",
+      "department": "engineering",
+      "defaultTools": ["Read", "Grep", "Glob", "Write", "Edit", "Bash"],
+      "focusAreas": ["refactoring", "readability", "performance", "duplication"]
+    },
+    "test-writer": {
+      "description": "Writes unit, integration, and end-to-end test cases",
+      "department": "qa",
+      "defaultTools": ["Read", "Grep", "Glob", "Bash"],
+      "focusAreas": ["unit-tests", "integration-tests", "e2e", "coverage"]
+    },
+    "test-runner": {
+      "description": "Executes test suites and reports pass/fail results",
+      "department": "qa",
+      "defaultTools": ["Read", "Grep", "Glob", "Bash"],
+      "focusAreas": ["test-execution", "results", "CI", "regression"]
+    },
+    "security-auditor": {
+      "description": "Audits code for security vulnerabilities and insecure patterns",
+      "department": "qa",
+      "defaultTools": ["Read", "Grep", "Glob", "Bash"],
+      "focusAreas": ["security", "vulnerabilities", "injection", "auth", "secrets"]
+    },
+    "perf-tester": {
+      "description": "Runs performance tests and benchmarks, reports quantitative results",
+      "department": "qa",
+      "defaultTools": ["Read", "Grep", "Glob", "Bash"],
+      "focusAreas": ["performance", "benchmarks", "throughput", "latency", "profiling"]
+    },
+    "requirements-analyzer": {
+      "description": "Analyses user requests and produces structured requirements with acceptance criteria",
+      "department": "product",
+      "defaultTools": ["Read"],
+      "focusAreas": ["requirements", "acceptance-criteria", "user-stories", "scope"]
+    },
+    "user-flow-mapper": {
+      "description": "Traces user-facing flows through the system and documents steps and edge cases",
+      "department": "product",
+      "defaultTools": ["Read"],
+      "focusAreas": ["user-flows", "UX", "edge-cases", "journey-mapping"]
+    },
+    "code-explorer": {
+      "description": "Explores the codebase to answer specific questions by reading files and tracing call chains",
+      "department": "research",
+      "defaultTools": ["Read", "Grep", "Glob"],
+      "focusAreas": ["codebase", "exploration", "call-chains", "architecture"]
+    },
+    "doc-searcher": {
+      "description": "Searches documentation, READMEs, comments, and external references for relevant information",
+      "department": "research",
+      "defaultTools": ["Read", "Grep", "Glob", "WebSearch"],
+      "focusAreas": ["documentation", "README", "references", "knowledge"]
+    },
+    "benchmark-runner": {
+      "description": "Runs benchmarks and collects quantitative data with methodology notes",
+      "department": "research",
+      "defaultTools": ["Read", "Grep", "Glob", "WebSearch"],
+      "focusAreas": ["benchmarks", "data-collection", "methodology", "comparison"]
+    },
+    "minutes-writer": {
+      "description": "Writes structured meeting minutes from transcripts including summary, decisions, and action items",
+      "department": "research",
+      "defaultTools": ["Read", "Grep", "Glob"],
+      "focusAreas": ["minutes", "summary", "decisions", "action-items"]
+    },
+    "compactor": {
+      "description": "Compacts long conversation transcripts into shorter summaries preserving decisions and action items",
+      "department": "research",
+      "defaultTools": ["Read", "Grep", "Glob"],
+      "focusAreas": ["compaction", "summarization", "transcript", "context-reduction"]
+    }
+  }
+}
