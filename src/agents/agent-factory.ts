@@ -136,18 +136,14 @@ export function createAgentConfig(opts: CreateAgentConfigOptions): AgentConfig {
     }
   }
 
-  // Research workers use a lighter model and tighter budget
-  let model = tierCfg.model;
-  let maxBudgetUsd = tierCfg.maxBudgetUsd;
-  if (tier === 'worker' && department === 'research') {
-    model = 'claude-haiku-4-5';
-    maxBudgetUsd = 0.10;
-  }
+  // Research workers use a lighter model
+  const model = (tier === 'worker' && department === 'research')
+    ? 'claude-haiku-4-5'
+    : tierCfg.model;
 
   return {
     model,
     maxTurns: tierCfg.maxTurns,
-    maxBudgetUsd,
     allowedTools,
   };
 }

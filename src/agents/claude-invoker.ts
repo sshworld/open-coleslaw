@@ -12,7 +12,6 @@ export interface InvokeOptions {
   systemPrompt: string;
   allowedTools: string[];
   maxTurns: number;
-  maxBudgetUsd?: number;
   cwd?: string;
   /** Timeout in milliseconds. Defaults to 300_000 (5 min). */
   timeoutMs?: number;
@@ -139,7 +138,6 @@ async function invokeReal(options: InvokeOptions): Promise<InvokeResult> {
     systemPrompt,
     allowedTools,
     maxTurns,
-    maxBudgetUsd,
     cwd,
     timeoutMs = 300_000,
   } = options;
@@ -321,7 +319,6 @@ export function buildInvokeOptions(
     systemPrompt,
     allowedTools: config.allowedTools,
     maxTurns: config.maxTurns,
-    maxBudgetUsd: config.maxBudgetUsd,
     cwd,
   };
 }

@@ -28,13 +28,6 @@ describe('type constants', () => {
       }
     });
 
-    it('should have positive maxBudgetUsd for each tier', () => {
-      for (const tier of ['orchestrator', 'leader', 'worker'] as const) {
-        expect(TIER_CONFIGS[tier].maxBudgetUsd).toBeTypeOf('number');
-        expect(TIER_CONFIGS[tier].maxBudgetUsd).toBeGreaterThan(0);
-      }
-    });
-
     it('should give leaders more turns than orchestrators', () => {
       expect(TIER_CONFIGS.leader.maxTurns).toBeGreaterThan(TIER_CONFIGS.orchestrator.maxTurns);
     });

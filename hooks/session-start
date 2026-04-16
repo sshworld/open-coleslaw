@@ -7,10 +7,13 @@ set -euo pipefail
 RULES_FILE="${CLAUDE_PLUGIN_ROOT}/src/assets/rules.md"
 GUIDE_FILE="${CLAUDE_PLUGIN_ROOT}/src/assets/plugin-guide.md"
 
-CONTENT=""
+CONTENT="🥬 Open Coleslaw loaded — View Dashboard Live @ http://localhost:35143
+
+---
+"
 
 if [ -f "$RULES_FILE" ]; then
-  CONTENT=$(cat "$RULES_FILE")
+  CONTENT="${CONTENT}$(cat "$RULES_FILE")"
 fi
 
 if [ -f "$GUIDE_FILE" ]; then

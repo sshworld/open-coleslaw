@@ -9,9 +9,8 @@ describe('createAgentConfig', () => {
         role: 'orchestrator',
         department: 'architecture',
       });
-      expect(config.model).toBe('claude-sonnet-4-6');
+      expect(config.model).toBe('claude-opus-4-6');
       expect(config.maxTurns).toBe(10);
-      expect(config.maxBudgetUsd).toBe(1.0);
     });
 
     it('includes department tools in allowedTools', () => {
@@ -35,7 +34,7 @@ describe('createAgentConfig', () => {
       });
       expect(config.model).toBe('claude-sonnet-4-6');
       expect(config.maxTurns).toBe(20);
-      expect(config.maxBudgetUsd).toBe(2.0);
+
       expect(config.allowedTools).toContain('Write');
       expect(config.allowedTools).toContain('Edit');
       expect(config.allowedTools).toContain('Bash');
@@ -52,7 +51,7 @@ describe('createAgentConfig', () => {
       });
       expect(config.model).toBe('claude-sonnet-4-6');
       expect(config.maxTurns).toBe(30);
-      expect(config.maxBudgetUsd).toBe(0.5);
+
       expect(config.allowedTools).toContain('Write');
     });
 
@@ -76,7 +75,7 @@ describe('createAgentConfig', () => {
         task: 'Explore the authentication module',
       });
       expect(config.model).toBe('claude-haiku-4-5');
-      expect(config.maxBudgetUsd).toBe(0.10);
+
     });
 
     it('does not override non-research workers', () => {
@@ -87,7 +86,7 @@ describe('createAgentConfig', () => {
         task: 'Implement feature X',
       });
       expect(config.model).toBe('claude-sonnet-4-6');
-      expect(config.maxBudgetUsd).toBe(0.5);
+
     });
 
     it('does not override research leaders', () => {
@@ -97,7 +96,7 @@ describe('createAgentConfig', () => {
         department: 'research',
       });
       expect(config.model).toBe('claude-sonnet-4-6');
-      expect(config.maxBudgetUsd).toBe(2.0);
+
     });
   });
 });

@@ -27,7 +27,7 @@ export function isValidParent(parentTier: AgentTier, childTier: AgentTier): bool
 }
 
 /**
- * Look up the tier-level configuration (model, maxTurns, maxBudgetUsd).
+ * Look up the tier-level configuration (model, maxTurns).
  *
  * Returns a copy so callers can safely mutate the result without affecting
  * the shared config.

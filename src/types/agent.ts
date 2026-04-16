@@ -61,7 +61,7 @@ export interface AgentNode {
 export interface AgentConfig {
   model: string;
   maxTurns: number;
-  maxBudgetUsd: number;
+
   allowedTools: string[];
 }
 
@@ -69,17 +69,14 @@ export const TIER_CONFIGS: Record<AgentTier, Omit<AgentConfig, 'allowedTools'>> 
   orchestrator: {
     model: 'claude-opus-4-6',
     maxTurns: 10,
-    maxBudgetUsd: 5.0,
   },
   leader: {
     model: 'claude-sonnet-4-6',
     maxTurns: 20,
-    maxBudgetUsd: 2.0,
   },
   worker: {
     model: 'claude-sonnet-4-6',
     maxTurns: 30,
-    maxBudgetUsd: 0.5,
   },
 };
 

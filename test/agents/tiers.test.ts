@@ -30,25 +30,22 @@ describe('isValidParent', () => {
 });
 
 describe('getTierConfig', () => {
-  it('returns orchestrator config with correct model, maxTurns, maxBudgetUsd', () => {
+  it('returns orchestrator config with correct model and maxTurns', () => {
     const config = getTierConfig('orchestrator');
-    expect(config.model).toBe('claude-sonnet-4-6');
+    expect(config.model).toBe('claude-opus-4-6');
     expect(config.maxTurns).toBe(10);
-    expect(config.maxBudgetUsd).toBe(1.0);
   });
 
   it('returns leader config', () => {
     const config = getTierConfig('leader');
     expect(config.model).toBe('claude-sonnet-4-6');
     expect(config.maxTurns).toBe(20);
-    expect(config.maxBudgetUsd).toBe(2.0);
   });
 
   it('returns worker config', () => {
     const config = getTierConfig('worker');
     expect(config.model).toBe('claude-sonnet-4-6');
     expect(config.maxTurns).toBe(30);
-    expect(config.maxBudgetUsd).toBe(0.5);
   });
 
   it('returns a copy (not the shared object)', () => {
