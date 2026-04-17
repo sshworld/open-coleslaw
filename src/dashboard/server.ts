@@ -6,6 +6,7 @@ import { DashboardClient } from './client.js';
 import { eventBus } from '../orchestrator/event-bus.js';
 import { getConfig } from '../utils/config.js';
 import { logger } from '../utils/logger.js';
+import { enqueueComment } from './comment-queue.js';
 import type { AgentEvent, ServerMessage } from '../types/dashboard-events.js';
 
 export interface DashboardHandle {
@@ -21,6 +22,11 @@ export interface DashboardOptions {
 
 export function startDashboard(options: DashboardOptions): Promise<DashboardHandle> {
   const port = getConfig().DASHBOARD_PORT;
+
+  // Map sessionId → projectPath so browser comments can be routed to the
+  // correct per-project queue file.
+  const sessionProjectPaths = new Map<string, string>();
+  sessionProjectPaths.set(options.sessionId, options.projectPath);
 
   return new Promise((resolve) => {
     const httpServer = createHttpServer((req, res) => {
@@ -83,7 +89,7 @@ export function startDashboard(options: DashboardOptions): Promise<DashboardHand
                 projectPath: msg.projectPath,
                 projectName: msg.projectName,
               });
-              // Notify all browser clients
+              sessionProjectPaths.set(msg.sessionId, msg.projectPath);
               const notification = JSON.stringify({
                 type: 'session-registered',
                 sessionId: msg.sessionId,
@@ -97,6 +103,7 @@ export function startDashboard(options: DashboardOptions): Promise<DashboardHand
               bridge.handleSessionEvent(msg.sessionId, msg.event);
             } else if (msg.type === 'unregister') {
               bridge.unregisterSession(msg.sessionId);
+              sessionProjectPaths.delete(msg.sessionId);
               const notification = JSON.stringify({
                 type: 'session-unregistered',
                 sessionId: msg.sessionId,
@@ -104,7 +111,32 @@ export function startDashboard(options: DashboardOptions): Promise<DashboardHand
               wss.clients.forEach((c) => {
                 if (c.readyState === WebSocket.OPEN) c.send(notification);
               });
-            } else if ((msg as any).type === 'ping') {
+            } else if (msg.type === 'user-comment') {
+              // Browser sent a comment targeting a specific session's meeting.
+              // Route to the right project's comment queue.
+              const projectPath = sessionProjectPaths.get(msg.sessionId);
+              if (!projectPath) {
+                logger.warn(`user-comment for unknown sessionId: ${msg.sessionId}`);
+                return;
+              }
+              enqueueComment(projectPath, {
+                meetingId: msg.meetingId,
+                content: msg.content,
+                createdAt: Date.now(),
+                source: 'browser',
+              }).catch((err: unknown) => {
+                logger.error(
+                  `Failed to enqueue browser comment: ${err instanceof Error ? err.message : String(err)}`,
+                );
+              });
+              // Optimistically reflect in the UI so the user sees their comment land.
+              bridge.handleSessionEvent(msg.sessionId, {
+                kind: 'user_comment_added',
+                meetingId: msg.meetingId,
+                content: msg.content,
+                source: 'browser',
+              });
+            } else if ((msg as { type?: string }).type === 'ping') {
               ws.send(JSON.stringify({ type: 'pong' }));
             }
           } catch {

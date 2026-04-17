@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Open Coleslaw — Stop Hook
+# Runs after Claude Code finishes a response. When an open-coleslaw cycle just
+# completed (orchestrator touched `.cycle-complete`), parse the transcript JSONL
+# to estimate context usage and recommend /compact or /clear if >= threshold.
+#
+# Silent on every other turn — no nagging.
+
+# Read stdin (Stop hook payload: { session_id, transcript_path, cwd, ... })
+INPUT=$(cat || true)
+
+TRANSCRIPT_PATH=$(printf '%s' "$INPUT" | python3 -c 'import sys,json;d=json.loads(sys.stdin.read() or "{}");print(d.get("transcript_path",""))' 2>/dev/null || echo "")
+CWD=$(printf '%s' "$INPUT" | python3 -c 'import sys,json;d=json.loads(sys.stdin.read() or "{}");print(d.get("cwd",""))' 2>/dev/null || echo "")
+
+[ -z "$CWD" ] && CWD="$PWD"
+MARKER="${CWD}/docs/open-coleslaw/.cycle-complete"
+
+# Fast path: no marker → do nothing.
+if [ ! -f "$MARKER" ]; then
+  exit 0
+fi
+
+# Consume the marker so we only alert once per cycle end.
+rm -f "$MARKER"
+
+# If we can't locate the transcript, stay quiet rather than noisy.
+if [ -z "$TRANSCRIPT_PATH" ] || [ ! -f "$TRANSCRIPT_PATH" ]; then
+  exit 0
+fi
+
+# Sum the last assistant turn's usage. Falls back to 0 if malformed.
+USAGE=$(python3 - "$TRANSCRIPT_PATH" <<'PY' 2>/dev/null || echo "0 200000"
+import json, sys
+path = sys.argv[1]
+input_tokens = 0
+model = ""
+try:
+    with open(path, "r", encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except Exception:
+                continue
+            msg = rec.get("message") or {}
+            if not isinstance(msg, dict):
+                continue
+            usage = msg.get("usage")
+            if isinstance(usage, dict):
+                it = usage.get("input_tokens", 0) or 0
+                cr = usage.get("cache_read_input_tokens", 0) or 0
+                cc = usage.get("cache_creation_input_tokens", 0) or 0
+                total = int(it) + int(cr) + int(cc)
+                if total > 0:
+                    input_tokens = total
+            m = msg.get("model") or rec.get("model")
+            if isinstance(m, str):
+                model = m
+except Exception:
+    pass
+
+# Window lookup (rough heuristic; overridden by COLESLAW_CONTEXT_WINDOW env)
+window = 200000
+lower = (model or "").lower()
+if "opus" in lower and "1m" in lower:
+    window = 1_000_000
+elif "haiku" in lower:
+    window = 200_000
+elif "sonnet" in lower:
+    window = 200_000
+print(f"{input_tokens} {window}")
+PY
+)
+
+TOKENS=$(printf '%s' "$USAGE" | awk '{print $1}')
+WINDOW_DEFAULT=$(printf '%s' "$USAGE" | awk '{print $2}')
+
+WINDOW="${COLESLAW_CONTEXT_WINDOW:-$WINDOW_DEFAULT}"
+THRESHOLD_PCT="${COLESLAW_CONTEXT_THRESHOLD:-30}"
+
+# Guard against zeros
+if [ -z "$TOKENS" ] || [ "$TOKENS" -eq 0 ] 2>/dev/null || [ -z "$WINDOW" ] || [ "$WINDOW" -eq 0 ] 2>/dev/null; then
+  exit 0
+fi
+
+PCT=$(( (TOKENS * 100) / WINDOW ))
+
+if [ "$PCT" -lt "$THRESHOLD_PCT" ]; then
+  exit 0
+fi
+
+MSG=$(printf 'Open Coleslaw: cycle complete. Context usage is ~%d%% (%d / %d tokens). Recommend running /compact or /clear before the next cycle — meeting minutes persist in docs/open-coleslaw/.' "$PCT" "$TOKENS" "$WINDOW")
+
+ESCAPED=$(printf '%s' "$MSG" | python3 -c 'import sys,json;print(json.dumps(sys.stdin.read())[1:-1])')
+
+printf '{"systemMessage":"%s"}\n' "$ESCAPED"
+exit 0

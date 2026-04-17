@@ -57,8 +57,6 @@ const WORKER_DESCRIPTIONS: Record<WorkerType, string> = {
   // Cross-cutting workers
   'minutes-writer':
     'You write structured meeting minutes from a transcript. Output: summary, decisions, action items, and @mentions.',
-  compactor:
-    'You compact long conversation transcripts into a shorter summary that preserves all decisions, action items, and open questions.',
 };
 
 // ---------------------------------------------------------------------------

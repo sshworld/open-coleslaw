@@ -8,3 +8,11 @@ export { createMinutes, getMinutesByMeeting } from './minutes-store.js';
 export { getTasksFromMinutes, updateTaskInMinutes } from './task-store.js';
 export { insertEvent, listEvents } from './event-store.js';
 export type { StoredEvent } from './event-store.js';
+export {
+  createMvp,
+  getMvp,
+  listMvpsByKickoff,
+  listPendingMvps,
+  updateMvp,
+} from './mvp-store.js';
+export type { MvpRecord, MvpStatus } from './mvp-store.js';

@@ -2,7 +2,7 @@
  * End-to-end integration test for the new architecture.
  *
  * New flow: Orchestrator creates meeting (sync) → transcripts added via MCP tool
- * → minutes generated → compacted → tasks returned.
+ * → minutes generated → action items already structured by planner.
  * No subprocess spawning. Agent dispatch is external (Claude Code Agent tool).
  */
 
@@ -27,7 +27,6 @@ const dbMock = (await import('../../src/storage/db.js')) as any;
 
 const { Orchestrator } = await import('../../src/orchestrator/orchestrator.js');
 const { MeetingRunner } = await import('../../src/orchestrator/meeting-runner.js');
-const { Compactor } = await import('../../src/meeting/compactor.js');
 const { getMeeting, listMeetings, getMinutesByMeeting } = await import(
   '../../src/storage/index.js'
 );
@@ -41,7 +40,7 @@ afterEach(() => {
 });
 
 describe('E2E: meeting data flow', () => {
-  it('creates meeting, adds transcripts, generates minutes, compacts', async () => {
+  it('creates meeting, adds transcripts, generates minutes with action items', async () => {
     const orchestrator = new Orchestrator();
 
     // 1. Start meeting (sync — just creates record)
@@ -59,7 +58,7 @@ describe('E2E: meeting data flow', () => {
     expect(meeting!.topic).toBe('API Design');
     expect(meeting!.status).toBe('pending');
 
-    // 2. Add transcripts (simulating leader agent responses via MCP tool)
+    // 2. Add transcripts (simulating specialist agent responses via MCP tool)
     const runner = new MeetingRunner(result.meetingId);
 
     runner.addTranscript('architect', 0, 1,
@@ -80,17 +79,8 @@ describe('E2E: meeting data flow', () => {
     expect(minutes!.content).toContain('Meeting Minutes');
     expect(minutes!.content).toContain('API Design');
 
-    // 4. Compact minutes into tasks
-    const compactor = new Compactor();
-    const actionItems = await compactor.compactMinutes(result.meetingId);
-    expect(actionItems.length).toBeGreaterThanOrEqual(1);
-
-    for (const item of actionItems) {
-      expect(item).toHaveProperty('id');
-      expect(item).toHaveProperty('title');
-      expect(item).toHaveProperty('assignedDepartment');
-      expect(item).toHaveProperty('priority');
-    }
+    // 4. Minutes include action items (no separate compaction step)
+    expect(Array.isArray(minutes!.actionItems)).toBe(true);
 
     // 5. Meeting shows up in list
     const all = listMeetings();

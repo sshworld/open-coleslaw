@@ -1,51 +1,44 @@
 /**
- * StateBridge — manages per-session state and emits 'broadcast' events
+ * StateBridge — manages per-session meeting state and emits 'broadcast' events
  * for the dashboard server to relay to browser WebSocket clients.
  *
- * Supports multiple sessions (one per MCP server instance).  Each session
- * tracks its own agent graph independently.  Disconnected sessions are kept
- * (grayed-out tab) rather than deleted.
+ * Scope is now a *meeting thread* (topic + agenda + comments + mvp checklist),
+ * not the old agent-graph. Each session tracks its current in-progress meeting
+ * plus a short history of past meetings.
  */
 
 import { EventEmitter } from 'node:events';
 import type {
-  AgentState,
-  EdgeState,
-  MeetingState,
+  MeetingThread,
+  MvpSummary,
+  ThreadComment,
   AgentEvent,
+  SessionSnapshot,
   MultiSessionSnapshot,
   SessionDelta,
 } from '../types/dashboard-events.js';
 import { logger } from '../utils/logger.js';
 
-// ---------------------------------------------------------------------------
-// Per-session state container
-// ---------------------------------------------------------------------------
+const MAX_PAST_MEETINGS = 5;
+const EVENT_DEBOUNCE_MS = 100;
 
 interface SessionState {
   projectName: string;
   displayName: string;
   projectPath: string;
   isActive: boolean;
-  agents: Map<string, AgentState>;
-  edges: EdgeState[];
-  meeting: MeetingState | null;
+  currentMeeting: MeetingThread | null;
+  pastMeetings: MeetingThread[];
+  mvps: MvpSummary[];
   totalCost: number;
-  eventLog: Array<{ timestamp: number; event: AgentEvent }>;
 }
-
-// ---------------------------------------------------------------------------
-// StateBridge
-// ---------------------------------------------------------------------------
 
 export class StateBridge extends EventEmitter {
   private sessions = new Map<string, SessionState>();
   private debounceTimers = new Map<string, NodeJS.Timeout>();
   private pendingEvents = new Map<string, AgentEvent[]>();
 
-  // -----------------------------------------------------------------------
-  // Session lifecycle
-  // -----------------------------------------------------------------------
+  // ---- Session lifecycle --------------------------------------------------
 
   registerSession(info: {
     sessionId: string;
@@ -59,16 +52,14 @@ export class StateBridge extends EventEmitter {
       displayName,
       projectPath: info.projectPath,
       isActive: true,
-      agents: new Map(),
-      edges: [],
-      meeting: null,
+      currentMeeting: null,
+      pastMeetings: [],
+      mvps: [],
       totalCost: 0,
-      eventLog: [],
     });
 
     logger.info(`Session registered: ${displayName} (${info.sessionId})`);
 
-    // Notify browser clients about the new session
     this.emit(
       'broadcast',
       JSON.stringify({
@@ -88,7 +79,6 @@ export class StateBridge extends EventEmitter {
       session.isActive = false;
       logger.info(`Session deactivated: ${session.displayName}`);
 
-      // Don't delete — keep for display (grayed-out tab)
       this.emit(
         'broadcast',
         JSON.stringify({
@@ -99,60 +89,51 @@ export class StateBridge extends EventEmitter {
     }
   }
 
-  // -----------------------------------------------------------------------
-  // Event handling
-  // -----------------------------------------------------------------------
+  // ---- Event handling -----------------------------------------------------
 
   handleSessionEvent(sessionId: string, event: AgentEvent): void {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
-    // Apply event to session state
     this.applyEvent(session, event);
 
-    // Queue for debounced broadcast
     if (!this.pendingEvents.has(sessionId)) {
       this.pendingEvents.set(sessionId, []);
     }
     this.pendingEvents.get(sessionId)!.push(event);
 
-    // Debounce broadcast per session (100ms)
     if (!this.debounceTimers.has(sessionId)) {
       this.debounceTimers.set(
         sessionId,
         setTimeout(() => {
           this.flushEvents(sessionId);
           this.debounceTimers.delete(sessionId);
-        }, 100),
+        }, EVENT_DEBOUNCE_MS),
       );
     }
   }
 
-  // -----------------------------------------------------------------------
-  // Snapshot (sent to newly connected browser clients)
-  // -----------------------------------------------------------------------
+  // ---- Snapshot (initial connection) --------------------------------------
 
   getSnapshot(): MultiSessionSnapshot {
     return {
       type: 'multi-snapshot',
-      sessions: Array.from(this.sessions.entries()).map(([sessionId, s]) => ({
-        sessionId,
-        displayName: s.displayName,
-        projectPath: s.projectPath,
-        isActive: s.isActive,
-        snapshot: {
-          agents: Array.from(s.agents.values()),
-          edges: [...s.edges],
-          meeting: s.meeting,
+      sessions: Array.from(this.sessions.entries()).map(
+        ([sessionId, s]): SessionSnapshot => ({
+          sessionId,
+          displayName: s.displayName,
+          projectPath: s.projectPath,
+          isActive: s.isActive,
+          currentMeeting: s.currentMeeting,
+          pastMeetings: [...s.pastMeetings],
+          mvps: [...s.mvps],
           totalCost: s.totalCost,
-        },
-      })),
+        }),
+      ),
     };
   }
 
-  // -----------------------------------------------------------------------
-  // Private — unique display name
-  // -----------------------------------------------------------------------
+  // ---- Private helpers ----------------------------------------------------
 
   private getUniqueDisplayName(projectName: string): string {
     const existing = Array.from(this.sessions.values()).map(
@@ -164,106 +145,95 @@ export class StateBridge extends EventEmitter {
     return `${projectName} (${i})`;
   }
 
-  // -----------------------------------------------------------------------
-  // Private — state mutations (scoped to a session)
-  // -----------------------------------------------------------------------
-
   private applyEvent(session: SessionState, event: AgentEvent): void {
-    session.eventLog.push({ timestamp: Date.now(), event });
-    // Keep log bounded
-    if (session.eventLog.length > 500) session.eventLog.shift();
-
     switch (event.kind) {
-      case 'agent_spawned': {
-        const agent: AgentState = {
-          id: event.agentId,
-          type: event.agentType,
-          label: event.label,
-          status: 'idle',
-          parentId: event.parentId,
-          department: event.department,
-          currentTask: null,
-          costUsd: 0,
+      case 'meeting_started': {
+        if (session.currentMeeting) {
+          session.pastMeetings.unshift(session.currentMeeting);
+          if (session.pastMeetings.length > MAX_PAST_MEETINGS) {
+            session.pastMeetings.pop();
+          }
+        }
+        session.currentMeeting = {
+          meetingId: event.meetingId,
+          meetingType: event.meetingType,
+          topic: event.topic,
+          agenda: [...event.agenda],
+          participants: [...event.participants],
+          status: 'in-progress',
+          phase: 'opening',
+          comments: [],
+          mvps: [],
+          decisions: [],
+          actionItems: [],
+          startedAt: Date.now(),
+          completedAt: null,
         };
-        session.agents.set(event.agentId, agent);
-
-        if (event.parentId) {
-          session.edges.push({
-            id: `edge-${event.parentId}-${event.agentId}`,
-            source: event.parentId,
-            target: event.agentId,
-            edgeType: 'hierarchy',
-            active: true,
-            label: '',
-          });
+        break;
+      }
+      case 'transcript_added': {
+        if (session.currentMeeting?.meetingId === event.meetingId) {
+          session.currentMeeting.comments.push(event.comment);
         }
         break;
       }
-
-      case 'agent_destroyed': {
-        session.agents.delete(event.agentId);
-        session.edges = session.edges.filter(
-          (e) => e.source !== event.agentId && e.target !== event.agentId,
-        );
-        break;
-      }
-
-      case 'state_changed': {
-        const a = session.agents.get(event.agentId);
-        if (a) a.status = event.to;
-        break;
-      }
-
-      case 'task_assigned': {
-        const a = session.agents.get(event.agentId);
-        if (a) {
-          a.currentTask = event.taskSummary;
-          a.status = 'working';
+      case 'round_advanced': {
+        if (session.currentMeeting?.meetingId === event.meetingId) {
+          session.currentMeeting.phase = 'discussion';
         }
         break;
       }
-
-      case 'task_completed': {
-        const a = session.agents.get(event.agentId);
-        if (a) {
-          a.currentTask = null;
-          a.status = event.result === 'success' ? 'completed' : 'failed';
+      case 'consensus_checked': {
+        if (session.currentMeeting?.meetingId === event.meetingId) {
+          session.currentMeeting.status = event.allAgreed
+            ? 'in-progress' // about to synthesize
+            : 'awaiting-consensus';
         }
         break;
       }
-
-      case 'message_sent': {
-        const edgeId = `msg-${event.fromId}-${event.toId}-${Date.now()}`;
-        session.edges.push({
-          id: edgeId,
-          source: event.fromId,
-          target: event.toId,
-          edgeType: 'message',
-          active: true,
-          label: event.summary,
-        });
-        // Remove transient message edges after 5 seconds
-        setTimeout(() => {
-          session.edges = session.edges.filter((e) => e.id !== edgeId);
-        }, 5_000);
+      case 'minutes_finalized': {
+        if (session.currentMeeting?.meetingId === event.meetingId) {
+          session.currentMeeting.decisions = [...event.decisions];
+          session.currentMeeting.actionItems = [...event.actionItems];
+          session.currentMeeting.status = 'completed';
+          session.currentMeeting.phase = 'minutes-generation';
+          session.currentMeeting.completedAt = Date.now();
+        }
         break;
       }
-
-      case 'mention_created':
-      case 'mention_resolved':
-        // Logged but don't mutate the agent graph.
+      case 'user_comment_added': {
+        if (session.currentMeeting?.meetingId === event.meetingId) {
+          const nextId = session.currentMeeting.comments.length + 1;
+          const userComment: ThreadComment = {
+            id: nextId,
+            speakerRole: 'user',
+            agendaItemIndex: -3,
+            roundNumber: 0,
+            content: event.content,
+            stance: 'speaking',
+            createdAt: Date.now(),
+          };
+          session.currentMeeting.comments.push(userComment);
+        }
         break;
-
+      }
+      case 'mvp_progress': {
+        session.mvps = [...event.mvps];
+        if (session.currentMeeting) {
+          session.currentMeeting.mvps = [...event.mvps];
+        }
+        break;
+      }
       case 'cost_update': {
         session.totalCost = event.totalCost;
         break;
       }
+      case 'mention_created':
+      case 'mention_resolved':
+        // Not surfaced on the thread UI; mention list is a separate view.
+        break;
     }
   }
-
-  // -----------------------------------------------------------------------
-  // Private — flush debounced events
-  // -----------------------------------------------------------------------
 
   private flushEvents(sessionId: string): void {
     const events = this.pendingEvents.get(sessionId);

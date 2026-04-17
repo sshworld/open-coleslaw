@@ -212,7 +212,7 @@ export class MeetingRunner {
       id: `action-${this.meetingId}-${idx}`,
       title: `${role} deliverables`,
       description: `Action items committed by ${role} during synthesis phase`,
-      assignedDepartment: 'engineering', // default; will be refined by compactor
+      assignedDepartment: 'engineering', // default department; planner minutes may override
       assignedRole: role,
       priority: 'medium' as const,
       dependencies: [],

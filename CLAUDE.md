@@ -45,34 +45,38 @@ src/
   utils/                -- logger, config, cost tracker
 ```
 
-## MCP Tools (14 registered)
-1. `start-meeting` -- Convene department leaders for a structured discussion
+## MCP Tools (15 registered)
+1. `start-meeting` -- Convene a meeting (`kickoff` | `design` | `verify-retry`) with a topic + agenda
 2. `get-meeting-status` -- Get meeting progress and agent states
 3. `get-minutes` -- Retrieve PRD-format meeting minutes
-4. `compact-minutes` -- Convert minutes into department-assigned task list
-5. `execute-tasks` -- Deploy workers to implement tasks in parallel
-6. `get-agent-tree` -- Display the full agent hierarchy tree
-7. `respond-to-mention` -- Respond to a pending @mention decision
-8. `get-mentions` -- List @mentions filtered by status/meeting
-9. `cancel-meeting` -- Cancel a meeting with cascade to all workers
-10. `list-meetings` -- List meetings with status filter and pagination
-11. `get-task-report` -- Execution report with per-department breakdown
-12. `create-capability` -- Self-extend: create new hook/skill/command/asset/loop
-13. `get-cost-summary` -- Cost tracking per agent/meeting/department
-14. `chain-meeting` -- Link meetings: output of one feeds into the next
+4. `execute-tasks` -- Return the task list directly from `minutes.actionItems` for worker dispatch
+5. `get-agent-tree` -- Display the full agent hierarchy tree (bookkeeping)
+6. `respond-to-mention` -- Respond to a pending @mention decision
+7. `get-mentions` -- List @mentions filtered by status/meeting
+8. `cancel-meeting` -- Cancel a meeting with cascade to all workers
+9. `list-meetings` -- List meetings with status filter and pagination
+10. `get-task-report` -- Execution report with per-department breakdown
+11. `create-capability` -- Self-extend: create new hook/skill/command/asset/loop
+12. `get-cost-summary` -- Cost tracking per agent/meeting/department
+13. `chain-meeting` -- Link meetings: output of one feeds into the next
+14. `add-transcript` -- Record a speaker's turn during a meeting
+15. `generate-minutes` -- Write PRD minutes from the accumulated transcripts
 
 ## Agent Tiers
 | Tier | Model | Role |
 |------|-------|------|
-| Orchestrator | claude-opus-4-6 (1M) | Full-picture routing, delegation |
-| Leader | claude-sonnet-4-6 | Meetings, technical decisions |
+| Orchestrator | claude-opus-4-6 (1M) | Full-picture routing, delegation, MVP cycles |
+| Leader | claude-sonnet-4-6 | Meetings, technical decisions, consensus stance |
 | Worker (impl) | claude-sonnet-4-6 | Code, implementation |
 | Worker (research) | claude-haiku-4-5 | Quick lookups |
 
+Specialist leader roles: `planner`, `architect`, `engineer`, `verifier`, `product-manager`, `researcher`.
+
 ## Departments & Allowed Tools
+- **Planning**: Read (planner always attends; facilitates, doesn't take positions)
 - **Architecture**: Read, Grep, Glob
 - **Engineering**: Read, Grep, Glob, Write, Edit, Bash
-- **QA**: Read, Grep, Glob, Bash
+- **Verification**: Read, Grep, Glob, Bash (formerly QA; now also runs verification after implementation)
 - **Product**: Read
 - **Research**: Read, Grep, Glob, WebSearch
 
@@ -87,10 +91,14 @@ src/
 
 ## Key Decisions
 - Orchestrator is user's proxy/delegate, NOT CEO
-- Leaders communicate via relay-mediated meetings (MeetingRunner)
-- Workers spawned on-demand by leaders, destroyed after task completion
-- Minutes saved to both SQLite and ~/.open-coleslaw/minutes/ with INDEX.md
-- Dashboard uses inline HTML + Cytoscape.js from CDN (no React build step)
+- Kickoff meeting breaks user request into ordered MVPs before any design meeting
+- Meetings terminate on **consensus**, not round count (MAX_ROUNDS=10 escalates to @mention)
+- Planner always attends; facilitates and synthesizes, doesn't take technical positions
+- Dynamic attendee selection — not every specialist attends every meeting
+- Workers spawned on-demand by the orchestrator (Agent tool), destroyed after task completion
+- Minutes saved to project's `docs/open-coleslaw/` with INDEX.md (per-project, survives compact/clear)
+- Dashboard renders a **meeting thread + comments UI**; browser comments flow through a file queue
+- Stop hook checks context usage at cycle end (`.cycle-complete` marker) and suggests `/compact` or `/clear` above ~30%
 - Self-extending: creates new capabilities on demand
 - Rule priority: rules.md > CLAUDE.md > conversation context
-- MVP cycle: meeting -> develop -> verify -> (fail? -> re-meeting)
+- MVP cycle: kickoff -> (per MVP: design -> plan -> workers -> verify -> fail? verify-retry)

@@ -38,25 +38,25 @@
     },
     "test-writer": {
       "description": "Writes unit, integration, and end-to-end test cases",
-      "department": "qa",
+      "department": "verification",
       "defaultTools": ["Read", "Grep", "Glob", "Bash"],
       "focusAreas": ["unit-tests", "integration-tests", "e2e", "coverage"]
     },
     "test-runner": {
       "description": "Executes test suites and reports pass/fail results",
-      "department": "qa",
+      "department": "verification",
       "defaultTools": ["Read", "Grep", "Glob", "Bash"],
       "focusAreas": ["test-execution", "results", "CI", "regression"]
     },
     "security-auditor": {
       "description": "Audits code for security vulnerabilities and insecure patterns",
-      "department": "qa",
+      "department": "verification",
       "defaultTools": ["Read", "Grep", "Glob", "Bash"],
       "focusAreas": ["security", "vulnerabilities", "injection", "auth", "secrets"]
     },
     "perf-tester": {
       "description": "Runs performance tests and benchmarks, reports quantitative results",
-      "department": "qa",
+      "department": "verification",
       "defaultTools": ["Read", "Grep", "Glob", "Bash"],
       "focusAreas": ["performance", "benchmarks", "throughput", "latency", "profiling"]
     },
@@ -92,15 +92,9 @@
     },
     "minutes-writer": {
       "description": "Writes structured meeting minutes from transcripts including summary, decisions, and action items",
-      "department": "research",
+      "department": "planning",
       "defaultTools": ["Read", "Grep", "Glob"],
       "focusAreas": ["minutes", "summary", "decisions", "action-items"]
-    },
-    "compactor": {
-      "description": "Compacts long conversation transcripts into shorter summaries preserving decisions and action items",
-      "department": "research",
-      "defaultTools": ["Read", "Grep", "Glob"],
-      "focusAreas": ["compaction", "summarization", "transcript", "context-reduction"]
     }
   }
 }

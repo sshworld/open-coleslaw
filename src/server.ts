@@ -6,8 +6,6 @@ import {
   getMeetingStatusHandler,
   getMinutesSchema,
   getMinutesHandler,
-  compactMinutesSchema,
-  compactMinutesHandler,
   executeTasksSchema,
   executeTasksHandler,
   getAgentTreeHandler,
@@ -63,30 +61,22 @@ export function createServer(): McpServer {
     getMinutesHandler,
   );
 
-  // 4. compact-minutes
-  server.tool(
-    'compact-minutes',
-    'Compact meeting minutes into a structured, department-assigned task list',
-    compactMinutesSchema,
-    compactMinutesHandler,
-  );
-
-  // 5. execute-tasks
+  // 4. execute-tasks
   server.tool(
     'execute-tasks',
-    'Get the task list from compacted minutes for agent dispatch. Does NOT spawn workers.',
+    "Get the task list from a meeting's minutes.actionItems for agent dispatch. Does NOT spawn workers.",
     executeTasksSchema,
     executeTasksHandler,
   );
 
-  // 6. get-agent-tree
+  // 5. get-agent-tree
   server.tool(
     'get-agent-tree',
     'Return the full agent hierarchy tree',
     getAgentTreeHandler,
   );
 
-  // 7. respond-to-mention
+  // 6. respond-to-mention
   server.tool(
     'respond-to-mention',
     'Respond to a pending @mention with a decision',
@@ -94,7 +84,7 @@ export function createServer(): McpServer {
     respondToMentionHandler,
   );
 
-  // 8. get-mentions
+  // 7. get-mentions
   server.tool(
     'get-mentions',
     'List @mentions filtered by status and/or meeting',
@@ -102,7 +92,7 @@ export function createServer(): McpServer {
     getMentionsHandler,
   );
 
-  // 9. cancel-meeting
+  // 8. cancel-meeting
   server.tool(
     'cancel-meeting',
     'Cancel an active meeting and clean up its agents and workers',
@@ -110,7 +100,7 @@ export function createServer(): McpServer {
     cancelMeetingHandler,
   );
 
-  // 10. list-meetings
+  // 9. list-meetings
   server.tool(
     'list-meetings',
     'List meetings with optional status filter and pagination',
@@ -118,7 +108,7 @@ export function createServer(): McpServer {
     listMeetingsHandler,
   );
 
-  // 11. get-task-report
+  // 10. get-task-report
   server.tool(
     'get-task-report',
     'Generate a task execution report for a meeting with per-department breakdown',
@@ -126,7 +116,7 @@ export function createServer(): McpServer {
     getTaskReportHandler,
   );
 
-  // 12. create-capability
+  // 11. create-capability
   server.tool(
     'create-capability',
     'Create a new extension capability (hook, skill, command, asset, or loop)',
@@ -134,7 +124,7 @@ export function createServer(): McpServer {
     createCapabilityHandler,
   );
 
-  // 13. get-cost-summary
+  // 12. get-cost-summary
   server.tool(
     'get-cost-summary',
     'Get cost summary for a specific meeting or overall across all meetings',
@@ -142,7 +132,7 @@ export function createServer(): McpServer {
     getCostSummaryHandler,
   );
 
-  // 14. chain-meeting
+  // 13. chain-meeting
   server.tool(
     'chain-meeting',
     'Create a new meeting chained from a previous meeting, using its minutes as context. Does NOT run the meeting.',
@@ -150,7 +140,7 @@ export function createServer(): McpServer {
     chainMeetingHandler,
   );
 
-  // 15. add-transcript
+  // 14. add-transcript
   server.tool(
     'add-transcript',
     'Add a transcript entry to a meeting. Used to record speaker contributions during meeting phases.',
@@ -158,7 +148,7 @@ export function createServer(): McpServer {
     addTranscriptHandler,
   );
 
-  // 16. generate-minutes
+  // 15. generate-minutes
   server.tool(
     'generate-minutes',
     'Generate PRD minutes from all stored transcripts for a meeting. Marks the meeting as completed.',

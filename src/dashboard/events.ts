@@ -3,16 +3,20 @@
  */
 
 export type {
-  AgentState,
-  EdgeState,
-  MeetingState,
-  DashboardEvent,
+  MeetingThread,
+  MeetingThreadStatus,
+  MeetingType,
+  ThreadComment,
+  MvpSummary,
+  Stance,
   AgentEvent,
   ProjectSession,
   RegisterMessage,
   SessionEventMessage,
   UnregisterMessage,
+  UserCommentMessage,
   ServerMessage,
+  SessionSnapshot,
   MultiSessionSnapshot,
   SessionDelta,
   SessionRegistered,
@@ -22,26 +26,29 @@ export type {
 export type { AgentTier, AgentStatus } from '../types/agent.js';
 export type { MeetingPhase } from '../types/meeting.js';
 
-import type { DashboardEvent, AgentEvent } from '../types/dashboard-events.js';
+import type {
+  AgentEvent,
+  MultiSessionSnapshot,
+  SessionDelta,
+} from '../types/dashboard-events.js';
+
+export type AnyServerPayload =
+  | MultiSessionSnapshot
+  | SessionDelta
+  | { type: 'session-registered'; sessionId: string; displayName: string; projectPath: string }
+  | { type: 'session-unregistered'; sessionId: string };
 
 // ---------------------------------------------------------------------------
 // Serialization helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Serialize a DashboardEvent to a JSON string for WebSocket transmission.
- */
-export function serializeEvent(event: DashboardEvent): string {
+export function serializeEvent(event: AnyServerPayload): string {
   return JSON.stringify(event);
 }
 
-/**
- * Deserialize a JSON string back to a DashboardEvent.
- * Returns null if parsing fails.
- */
-export function deserializeEvent(raw: string): DashboardEvent | null {
+export function deserializeEvent(raw: string): AnyServerPayload | null {
   try {
-    return JSON.parse(raw) as DashboardEvent;
+    return JSON.parse(raw) as AnyServerPayload;
   } catch {
     return null;
   }
@@ -52,18 +59,20 @@ export function deserializeEvent(raw: string): DashboardEvent | null {
  */
 export function summarizeEvent(event: AgentEvent): string {
   switch (event.kind) {
-    case 'agent_spawned':
-      return `[SPAWN] ${event.label} (${event.agentType}) in ${event.department}`;
-    case 'agent_destroyed':
-      return `[DESTROY] ${event.agentId}`;
-    case 'state_changed':
-      return `[STATE] ${event.agentId}: ${event.from} -> ${event.to}`;
-    case 'task_assigned':
-      return `[TASK] ${event.agentId}: ${event.taskSummary}`;
-    case 'task_completed':
-      return `[DONE] ${event.agentId}: ${event.result}`;
-    case 'message_sent':
-      return `[MSG] ${event.fromId} -> ${event.toId}: ${event.summary}`;
+    case 'meeting_started':
+      return `[MEETING] ${event.meetingType}: "${event.topic}" (${event.participants.join(', ')})`;
+    case 'transcript_added':
+      return `[SPEAK] ${event.comment.speakerRole} (r${event.comment.roundNumber})`;
+    case 'round_advanced':
+      return `[ROUND] item ${event.agendaItemIndex}, round ${event.roundNumber}`;
+    case 'consensus_checked':
+      return `[CONSENSUS] ${event.allAgreed ? 'all agreed' : 'dissent remains'}`;
+    case 'minutes_finalized':
+      return `[MINUTES] ${event.decisions.length} decisions, ${event.actionItems.length} action items`;
+    case 'user_comment_added':
+      return `[USER:${event.source}] ${event.content.slice(0, 60)}`;
+    case 'mvp_progress':
+      return `[MVP] ${event.mvps.filter((m) => m.status === 'done').length}/${event.mvps.length} done`;
     case 'mention_created':
       return `[@MENTION] ${event.summary} (${event.urgency})`;
     case 'mention_resolved':

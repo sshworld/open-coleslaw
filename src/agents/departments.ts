@@ -12,6 +12,19 @@ export interface DepartmentInfo {
 
 const DEPARTMENT_REGISTRY: ReadonlyMap<Department, DepartmentInfo> = new Map<Department, DepartmentInfo>([
   [
+    'planning',
+    {
+      name: 'planning',
+      description:
+        'Responsible for running the meeting itself: managing agenda, calling speakers in round-robin, ' +
+        'checking consensus, decomposing user requirements into ordered MVPs, and synthesizing minutes. ' +
+        'Planning does not take technical positions — it facilitates.',
+      leaderRole: 'planner',
+      workerTypes: ['minutes-writer'],
+      allowedTools: DEPARTMENT_TOOLS.planning,
+    },
+  ],
+  [
     'architecture',
     {
       name: 'architecture',
@@ -36,15 +49,16 @@ const DEPARTMENT_REGISTRY: ReadonlyMap<Department, DepartmentInfo> = new Map<Dep
     },
   ],
   [
-    'qa',
+    'verification',
     {
-      name: 'qa',
+      name: 'verification',
       description:
-        'Responsible for test creation, test execution, security auditing, and performance testing. ' +
-        'QA ensures deliverables meet acceptance criteria and do not introduce regressions.',
-      leaderRole: 'qa',
+        'Responsible for test planning at meeting time and for running tests/build/security audits after ' +
+        'implementation. Verification ensures deliverables meet acceptance criteria and do not introduce ' +
+        'regressions. Blocks MVP completion if tests or build fail.',
+      leaderRole: 'verifier',
       workerTypes: ['test-writer', 'test-runner', 'security-auditor', 'perf-tester'],
-      allowedTools: DEPARTMENT_TOOLS.qa,
+      allowedTools: DEPARTMENT_TOOLS.verification,
     },
   ],
   [

@@ -1,31 +1,37 @@
 {
   "departments": {
+    "planning": {
+      "leader": "planner",
+      "description": "Meeting facilitation, MVP decomposition, consensus management, minutes synthesis",
+      "workers": ["minutes-writer"],
+      "tools": ["Read"]
+    },
     "architecture": {
-      "leader": "arch-leader",
+      "leader": "architect",
       "description": "System design, API contracts, DB schema",
       "workers": ["schema-designer", "api-designer", "dependency-analyzer"],
       "tools": ["Read", "Grep", "Glob"]
     },
     "engineering": {
-      "leader": "eng-leader",
+      "leader": "engineer",
       "description": "Implementation, code quality, feature development",
       "workers": ["feature-dev", "bug-fixer", "refactorer"],
       "tools": ["Read", "Grep", "Glob", "Write", "Edit", "Bash"]
     },
-    "qa": {
-      "leader": "qa-leader",
-      "description": "Testing, security auditing, performance testing",
+    "verification": {
+      "leader": "verifier",
+      "description": "Testing strategy at meeting time, and running tests/build/security at verification time",
       "workers": ["test-writer", "test-runner", "security-auditor", "perf-tester"],
       "tools": ["Read", "Grep", "Glob", "Bash"]
     },
     "product": {
-      "leader": "pm-leader",
+      "leader": "product-manager",
       "description": "Requirements analysis, user stories, stakeholder alignment",
       "workers": ["requirements-analyzer", "user-flow-mapper"],
       "tools": ["Read"]
     },
     "research": {
-      "leader": "research-leader",
+      "leader": "researcher",
       "description": "Codebase exploration, documentation search, benchmarking",
       "workers": ["code-explorer", "doc-searcher", "benchmark-runner"],
       "tools": ["Read", "Grep", "Glob", "WebSearch"]

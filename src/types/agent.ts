@@ -11,16 +11,18 @@ export type AgentStatus =
   | 'failed';
 
 export type Department =
+  | 'planning'
   | 'architecture'
   | 'engineering'
-  | 'qa'
+  | 'verification'
   | 'product'
   | 'research';
 
 export type LeaderRole =
+  | 'planner'
   | 'architect'
   | 'engineer'
-  | 'qa'
+  | 'verifier'
   | 'product-manager'
   | 'researcher';
 
@@ -40,8 +42,7 @@ export type WorkerType =
   | 'code-explorer'
   | 'doc-searcher'
   | 'benchmark-runner'
-  | 'minutes-writer'
-  | 'compactor';
+  | 'minutes-writer';
 
 export interface AgentNode {
   id: string;
@@ -81,9 +82,19 @@ export const TIER_CONFIGS: Record<AgentTier, Omit<AgentConfig, 'allowedTools'>> 
 };
 
 export const DEPARTMENT_TOOLS: Record<Department, string[]> = {
+  planning: ['Read'],
   architecture: ['Read', 'Grep', 'Glob'],
   engineering: ['Read', 'Grep', 'Glob', 'Write', 'Edit', 'Bash'],
-  qa: ['Read', 'Grep', 'Glob', 'Bash'],
+  verification: ['Read', 'Grep', 'Glob', 'Bash'],
   product: ['Read'],
   research: ['Read', 'Grep', 'Glob', 'WebSearch'],
+};
+
+export const ROLE_TO_DEPARTMENT: Record<LeaderRole, Department> = {
+  planner: 'planning',
+  architect: 'architecture',
+  engineer: 'engineering',
+  verifier: 'verification',
+  'product-manager': 'product',
+  researcher: 'research',
 };

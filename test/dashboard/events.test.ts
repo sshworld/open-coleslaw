@@ -1,27 +1,24 @@
 /**
  * Tests for src/dashboard/events.ts and src/dashboard/state-bridge.ts
  *
- * The StateBridge wires to the global eventBus and a WebSocketServer. We
- * provide a minimal mock WSS so that the constructor succeeds without starting
- * a real server.
+ * The dashboard now models meetings as threads of speaker comments, rather
+ * than as an agent graph. Events are: meeting_started, transcript_added,
+ * round_advanced, consensus_checked, minutes_finalized, user_comment_added,
+ * mvp_progress, mention_{created,resolved}, cost_update.
  */
 
-import { vi, describe, it, expect, beforeEach } from 'vitest';
-import type { DashboardEvent, AgentEvent } from '../../src/types/dashboard-events.js';
-
-// ---------------------------------------------------------------------------
-// Import serialisation helpers (pure functions — no mocking needed)
-// ---------------------------------------------------------------------------
+import { describe, it, expect, beforeEach } from 'vitest';
+import type {
+  AgentEvent,
+  MultiSessionSnapshot,
+  ThreadComment,
+} from '../../src/types/dashboard-events.js';
 
 const {
   serializeEvent,
   deserializeEvent,
   summarizeEvent,
 } = await import('../../src/dashboard/events.js');
-
-// ---------------------------------------------------------------------------
-// Import StateBridge (requires eventBus, but it's a singleton — fine in test)
-// ---------------------------------------------------------------------------
 
 const { StateBridge } = await import('../../src/dashboard/state-bridge.js');
 
@@ -30,12 +27,10 @@ const { StateBridge } = await import('../../src/dashboard/state-bridge.js');
 // ---------------------------------------------------------------------------
 
 describe('serializeEvent / deserializeEvent', () => {
-  it('round-trips a snapshot event', () => {
-    const snapshot: DashboardEvent = {
-      type: 'snapshot',
-      agents: [],
-      edges: [],
-      meeting: null,
+  it('round-trips a multi-session snapshot', () => {
+    const snapshot: MultiSessionSnapshot = {
+      type: 'multi-snapshot',
+      sessions: [],
     };
 
     const json = serializeEvent(snapshot);
@@ -45,21 +40,16 @@ describe('serializeEvent / deserializeEvent', () => {
     expect(parsed).toEqual(snapshot);
   });
 
-  it('round-trips a delta event', () => {
-    const delta: DashboardEvent = {
-      type: 'delta',
-      timestamp: Date.now(),
-      events: [
-        {
-          kind: 'cost_update',
-          totalCost: 1.23,
-        },
-      ],
+  it('round-trips a session-registered event', () => {
+    const registered = {
+      type: 'session-registered' as const,
+      sessionId: 's1',
+      displayName: 'proj-a',
+      projectPath: '/tmp/proj-a',
     };
-
-    const json = serializeEvent(delta);
+    const json = serializeEvent(registered);
     const parsed = deserializeEvent(json);
-    expect(parsed).toEqual(delta);
+    expect(parsed).toEqual(registered);
   });
 
   it('deserializeEvent returns null for invalid JSON', () => {
@@ -69,68 +59,83 @@ describe('serializeEvent / deserializeEvent', () => {
 });
 
 describe('summarizeEvent', () => {
-  it('summarises agent_spawned', () => {
+  it('summarises meeting_started', () => {
     const event: AgentEvent = {
-      kind: 'agent_spawned',
-      agentId: 'a1',
-      agentType: 'leader',
-      parentId: null,
-      label: 'engineer',
-      department: 'engineering',
-    };
-    const summary = summarizeEvent(event);
-    expect(summary).toContain('[SPAWN]');
-    expect(summary).toContain('engineer');
-    expect(summary).toContain('engineering');
-  });
-
-  it('summarises agent_destroyed', () => {
-    const event: AgentEvent = { kind: 'agent_destroyed', agentId: 'a1' };
-    expect(summarizeEvent(event)).toContain('[DESTROY]');
-  });
-
-  it('summarises state_changed', () => {
-    const event: AgentEvent = {
-      kind: 'state_changed',
-      agentId: 'a1',
-      from: 'idle',
-      to: 'working',
+      kind: 'meeting_started',
+      meetingId: 'm1',
+      meetingType: 'design',
+      topic: 'Add login',
+      agenda: ['Provider'],
+      participants: ['planner', 'engineer'],
     };
     const s = summarizeEvent(event);
-    expect(s).toContain('[STATE]');
-    expect(s).toContain('idle');
-    expect(s).toContain('working');
+    expect(s).toContain('[MEETING]');
+    expect(s).toContain('Add login');
+    expect(s).toContain('design');
   });
 
-  it('summarises task_assigned', () => {
-    const event: AgentEvent = {
-      kind: 'task_assigned',
-      agentId: 'a1',
-      taskSummary: 'Build API',
+  it('summarises transcript_added', () => {
+    const comment: ThreadComment = {
+      id: 1,
+      speakerRole: 'architect',
+      agendaItemIndex: 0,
+      roundNumber: 2,
+      content: 'REST is fine',
+      stance: 'speaking',
+      createdAt: Date.now(),
     };
-    expect(summarizeEvent(event)).toContain('[TASK]');
-    expect(summarizeEvent(event)).toContain('Build API');
-  });
-
-  it('summarises task_completed', () => {
     const event: AgentEvent = {
-      kind: 'task_completed',
-      agentId: 'a1',
-      result: 'success',
-    };
-    expect(summarizeEvent(event)).toContain('[DONE]');
-  });
-
-  it('summarises message_sent', () => {
-    const event: AgentEvent = {
-      kind: 'message_sent',
-      fromId: 'a1',
-      toId: 'a2',
-      summary: 'Hello',
+      kind: 'transcript_added',
+      meetingId: 'm1',
+      comment,
     };
     const s = summarizeEvent(event);
-    expect(s).toContain('[MSG]');
-    expect(s).toContain('Hello');
+    expect(s).toContain('[SPEAK]');
+    expect(s).toContain('architect');
+    expect(s).toContain('r2');
+  });
+
+  it('summarises consensus_checked (agreement)', () => {
+    const event: AgentEvent = {
+      kind: 'consensus_checked',
+      meetingId: 'm1',
+      allAgreed: true,
+      stances: [],
+    };
+    expect(summarizeEvent(event)).toContain('all agreed');
+  });
+
+  it('summarises minutes_finalized', () => {
+    const event: AgentEvent = {
+      kind: 'minutes_finalized',
+      meetingId: 'm1',
+      decisions: ['Use REST', 'JWT for auth'],
+      actionItems: ['Scaffold endpoints'],
+    };
+    expect(summarizeEvent(event)).toContain('2 decisions');
+  });
+
+  it('summarises user_comment_added', () => {
+    const event: AgentEvent = {
+      kind: 'user_comment_added',
+      meetingId: 'm1',
+      content: 'Can we also add refresh tokens?',
+      source: 'browser',
+    };
+    const s = summarizeEvent(event);
+    expect(s).toContain('[USER:browser]');
+    expect(s).toContain('refresh tokens');
+  });
+
+  it('summarises mvp_progress', () => {
+    const event: AgentEvent = {
+      kind: 'mvp_progress',
+      mvps: [
+        { id: '1', title: 'A', goal: '', status: 'done', orderIndex: 0 },
+        { id: '2', title: 'B', goal: '', status: 'pending', orderIndex: 1 },
+      ],
+    };
+    expect(summarizeEvent(event)).toContain('1/2 done');
   });
 
   it('summarises mention_created', () => {
@@ -143,17 +148,6 @@ describe('summarizeEvent', () => {
     const s = summarizeEvent(event);
     expect(s).toContain('[@MENTION]');
     expect(s).toContain('blocking');
-  });
-
-  it('summarises mention_resolved', () => {
-    const event: AgentEvent = {
-      kind: 'mention_resolved',
-      mentionId: 'm1',
-      decision: 'Go with REST',
-    };
-    const s = summarizeEvent(event);
-    expect(s).toContain('[@RESOLVED]');
-    expect(s).toContain('Go with REST');
   });
 
   it('summarises cost_update', () => {
@@ -172,25 +166,75 @@ describe('StateBridge', () => {
   let bridge: InstanceType<typeof StateBridge>;
 
   beforeEach(() => {
-    // Minimal mock of WebSocketServer that satisfies the constructor.
-    const mockWss = {
-      clients: new Set(),
-      on: vi.fn(),
-    } as any;
-
-    bridge = new StateBridge(mockWss);
+    bridge = new StateBridge();
   });
 
   it('constructs without error', () => {
     expect(bridge).toBeDefined();
   });
 
-  it('getSnapshot returns a MultiSessionSnapshot', () => {
+  it('getSnapshot returns an empty MultiSessionSnapshot', () => {
     const snap = bridge.getSnapshot();
-
     expect(snap.type).toBe('multi-snapshot');
     expect(Array.isArray(snap.sessions)).toBe(true);
     expect(snap.sessions).toHaveLength(0);
+  });
+
+  it('registerSession adds a session', () => {
+    const displayName = bridge.registerSession({
+      sessionId: 's1',
+      projectPath: '/tmp/x',
+      projectName: 'x',
+    });
+    expect(displayName).toBe('x');
+
+    const snap = bridge.getSnapshot();
+    expect(snap.sessions).toHaveLength(1);
+    expect(snap.sessions[0].sessionId).toBe('s1');
+    expect(snap.sessions[0].currentMeeting).toBeNull();
+  });
+
+  it('meeting_started event installs a current meeting', () => {
+    bridge.registerSession({ sessionId: 's1', projectPath: '/tmp/x', projectName: 'x' });
+    bridge.handleSessionEvent('s1', {
+      kind: 'meeting_started',
+      meetingId: 'm1',
+      meetingType: 'design',
+      topic: 'T',
+      agenda: ['A1'],
+      participants: ['planner', 'engineer'],
+    });
+    const snap = bridge.getSnapshot();
+    expect(snap.sessions[0].currentMeeting?.meetingId).toBe('m1');
+    expect(snap.sessions[0].currentMeeting?.topic).toBe('T');
+  });
+
+  it('transcript_added appends to the thread', () => {
+    bridge.registerSession({ sessionId: 's1', projectPath: '/tmp/x', projectName: 'x' });
+    bridge.handleSessionEvent('s1', {
+      kind: 'meeting_started',
+      meetingId: 'm1',
+      meetingType: 'design',
+      topic: 'T',
+      agenda: ['A1'],
+      participants: ['planner'],
+    });
+    bridge.handleSessionEvent('s1', {
+      kind: 'transcript_added',
+      meetingId: 'm1',
+      comment: {
+        id: 1,
+        speakerRole: 'planner',
+        agendaItemIndex: 0,
+        roundNumber: 1,
+        content: 'Opening...',
+        stance: 'speaking',
+        createdAt: Date.now(),
+      },
+    });
+    const snap = bridge.getSnapshot();
+    expect(snap.sessions[0].currentMeeting?.comments).toHaveLength(1);
+    expect(snap.sessions[0].currentMeeting?.comments[0].content).toBe('Opening...');
   });
 
   it('getSnapshot is serialisable via serializeEvent', () => {

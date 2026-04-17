@@ -2,7 +2,7 @@
 
 **Just type your prompt. Like coleslaw — it's already prepared, just scoop and eat.**
 
-Open Coleslaw is a multi-agent orchestrator plugin for Claude Code. It gives you an entire AI engineering team — architects, engineers, QA leads, product managers — that organizes itself, holds meetings, writes PRD-format minutes, and executes tasks.
+Open Coleslaw is a multi-agent orchestrator plugin for Claude Code. It gives you an entire AI engineering team — planner, architect, engineer, verifier, product manager, researcher — that organizes itself, runs real round-robin meetings, only ends a meeting when everyone actually agrees, and executes in MVP-sized cycles.
 
 Zero commands to memorize. Zero tools to call manually. Your AI team is already hired.
 
@@ -14,18 +14,21 @@ You type a prompt like *"Build me a balance game app"*. That's it.
 You: "Build me a balance game app"
 
   → Orchestrator dispatched (Agent tool)
-  → Convenes Architecture + Engineering + Product leaders
-  → Leaders hold a structured meeting
-  → PRD meeting minutes saved to docs/open-coleslaw/
-  → Plan Mode activated — you review the implementation plan
-  → You approve
-  → Implementer agents write the code
-  → Results reported
+  → Kickoff meeting: planner breaks it into ordered MVPs
+  → For each MVP:
+      → Design meeting: round-robin, consensus-based termination
+      → PRD meeting minutes saved to docs/open-coleslaw/
+      → Plan Mode activated — you review the implementation plan
+      → You approve
+      → Workers write the code in parallel
+      → Verifier runs tests/build
+      → Pass → next MVP ·  Fail → verify-retry meeting
+  → All MVPs done → final report
 ```
 
 You never call a tool. You never pick a department. You never manage an agent. The orchestrator handles everything — including entering **Plan Mode** so you can review the implementation plan in the native UI before any code is written.
 
-Meeting minutes are saved to `docs/open-coleslaw/` in your project, so you can always refer back to past decisions.
+Meeting minutes are saved to `docs/open-coleslaw/` in your project, so they persist even if you `/compact` or `/clear` your Claude Code context between MVPs.
 
 ## Installation
 
@@ -46,38 +49,43 @@ Start a new session and type anything:
 Design a REST API for a todo app
 ```
 
-You should see the orchestrator agent being dispatched and a meeting starting automatically.
+You should see the orchestrator agent being dispatched and a kickoff meeting starting automatically.
 
 ## The Pipeline
 
-Every request follows this flow. No exceptions.
+Every request follows this flow.
 
 ```
-Prompt → Orchestrator → Meeting → Minutes → Plan Mode → Approve → Implement
+Prompt
+  → Orchestrator
+  → Kickoff meeting (planner breaks request into MVPs)
+  → for each MVP:
+       Design meeting → consensus → Minutes → Plan Mode → Approve → Workers → Verify
+  → Final report
 ```
 
-1. **Orchestrator dispatched** — analyzes your request, selects departments
-2. **Meeting convened** — leaders discuss via Agent tool
-3. **PRD minutes saved** — to `docs/open-coleslaw/` in your project
-4. **Plan Mode activated** — implementation plan presented in native Plan Mode UI
-5. **You review and approve** — or request changes (chains a follow-up meeting)
-6. **Implementer agents dispatched** — write code following the approved plan
-7. **Results reported** — final output delivered to you
+Verification failure on an MVP doesn't abort the cycle — it opens a focused `verify-retry` meeting and re-plans the fix.
 
-## The Agent Hierarchy
+When the whole cycle ends the orchestrator touches a marker file, and the `Stop` hook checks your context usage. If you're over ~30%, it suggests running `/compact` or `/clear` before the next task. Minutes on disk mean you lose nothing.
+
+## The Agent Cast
 
 ```
          ┌─────────────────┐
          │   Orchestrator   │  ← Your proxy
-         │   (claude-opus)  │
+         │  (claude-opus)   │
          └────────┬────────┘
-    ┌─────────────┼─────────────┐
-    ▼             ▼             ▼
-┌──────────┐ ┌──────────┐ ┌──────────┐
-│ Architect│ │ Engineer │ │    QA    │  ← Specialists discuss
-└──────────┘ └──────────┘ └──────────┘
                   │
-            Plan Mode → User approves
+          (Kickoff → per-MVP loop)
+                  │
+    ┌─────────────┼─────────────────────────────┐
+    ▼             ▼             ▼               ▼
+┌─────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+│ Planner │ │ Architect│ │ Engineer │ │ Verifier │   dynamically convened +
+│(chair)  │ │          │ │          │ │          │   product-manager / researcher
+└─────────┘ └──────────┘ └──────────┘ └──────────┘
+                  │
+           Plan Mode → User approves
                   │
     ┌─────────────┼─────────────┐
     ▼             ▼             ▼
@@ -85,74 +93,79 @@ Prompt → Orchestrator → Meeting → Minutes → Plan Mode → Approve → Im
 │Worker 1│  │Worker 2│  │Worker N│     ← Parallel implementation
 └────────┘  └────────┘  └────────┘
                   │
-              Verify
-            /        \
-         Pass        Fail → Re-meeting
+            Verifier runs tests
+            /                \
+         Pass               Fail → verify-retry meeting
           ↓
-    Done (or next MVP)
+     Next MVP (or done)
 ```
 
-**5 Specialists**: Architect, Engineer, QA, Product Manager, Researcher
+**7 Specialists**: Planner, Architect, Engineer, Verifier, Product Manager, Researcher, plus Worker (parallelized).
 
-Work is done in **MVP cycles**: meeting → plan → workers → verify → repeat.
+The **planner always attends** — they chair the meeting, run the round-robin, and drive consensus. Other specialists are convened dynamically based on the task.
+
+## Meetings That Actually End on Agreement
+
+Rounds are not fixed. After every round the planner asks each participant AGREE or DISAGREE. The meeting only proceeds to synthesis when everyone agrees. If round 10 passes without consensus, the planner escalates via `@mention` for you to decide.
+
+This is deliberately slower than a fixed-round meeting — but each MVP ends with a real decision, not a paper one.
 
 ## What's Inside
 
-### 16 MCP Tools (orchestrator calls these — you never do)
+### 15 MCP Tools (orchestrator calls these — you never do)
 
 | Tool | What It Does |
 |------|-------------|
-| `start-meeting` | Creates a meeting record, recommends departments |
-| `add-transcript` | Saves a leader's discussion input |
-| `generate-minutes` | Converts transcripts into PRD meeting minutes |
-| `get-meeting-status` | Checks meeting progress and agent states |
-| `get-minutes` | Retrieves PRD-format meeting minutes |
-| `compact-minutes` | Converts minutes into actionable tasks per department |
-| `execute-tasks` | Returns structured task list for implementer agents |
+| `start-meeting` | Creates a meeting record (kickoff / design / verify-retry) |
+| `add-transcript` | Saves a speaker's turn |
+| `generate-minutes` | Writes PRD minutes from transcripts |
+| `get-meeting-status` | Reads meeting progress |
+| `get-minutes` | Retrieves full / summary / tasks-only minutes |
+| `execute-tasks` | Returns the structured task list from minutes for worker dispatch |
 | `get-task-report` | Shows execution results per department |
-| `get-agent-tree` | Displays the full agent hierarchy |
-| `respond-to-mention` | Handles decisions the agents need from you |
-| `get-mentions` | Lists pending @mention decision points |
-| `cancel-meeting` | Stops a meeting and cascades to all workers |
+| `get-agent-tree` | Displays the agent hierarchy (bookkeeping) |
+| `respond-to-mention` | Resolves a pending decision escalated by an agent |
+| `get-mentions` | Lists pending @mention decisions |
+| `cancel-meeting` | Stops a meeting and cascades to workers |
 | `list-meetings` | Shows meeting history |
 | `create-capability` | Self-extends the plugin with new hooks/skills |
-| `get-cost-summary` | Tracks spending per agent, meeting, department |
-| `chain-meeting` | Links meetings — output of one feeds into the next |
+| `get-cost-summary` | Tracks spend per agent/meeting/department |
+| `chain-meeting` | Links meetings — previous minutes feed the next |
 
-### 7 Agents (dispatched via Agent tool)
+### 8 Agents (dispatched via the Agent tool)
 
 | Agent | Role |
 |-------|------|
-| `orchestrator` | Your proxy — manages the full MVP cycle |
+| `orchestrator` | Your proxy — manages the kickoff + per-MVP cycles |
+| `planner` | Runs the meeting, chairs rounds, checks consensus, synthesises minutes |
 | `architect` | System design, API contracts, schemas |
 | `engineer` | Implementation feasibility, code quality |
-| `qa` | Testing strategy, security, edge cases |
-| `product-manager` | Requirements, user stories, prioritization |
-| `researcher` | Codebase exploration, prior art |
-| `worker` | Writes code (N workers dispatched in parallel) |
+| `verifier` | Testing strategy at design time; tests/build at verify time |
+| `product-manager` | Requirements, user stories, prioritisation |
+| `researcher` | Codebase exploration, prior art, library comparison |
+| `worker` | Writes code (N workers in parallel) |
 
 ### 7 Skills
 
 | Skill | Purpose |
 |-------|---------|
-| `using-open-coleslaw` | Loaded at session start — ensures all requests go through the pipeline |
+| `using-open-coleslaw` | Injected at session start — ensures all requests go through the pipeline |
 | `meeting` | Dispatches the orchestrator for the meeting → plan → implement flow |
 | `status` | Shows active meetings, agents, pending mentions |
-| `dashboard` | Opens the real-time Neon Ops Center |
+| `dashboard` | Opens the real-time dashboard |
 | `mention` | Handles pending @mention decisions |
 | `agents` | Shows the agent hierarchy tree |
 | `minutes` | Browses past meeting minutes |
 
-### Real-Time Dashboard
+### Real-Time Meeting Dashboard
 
-A cyberpunk-themed "Neon Ops Center" at `http://localhost:35143`:
+A live meeting viewer at `http://localhost:35143`:
 
-- Live agent hierarchy with animated connections
-- Per-project tabs (multiple terminals → multiple tabs)
-- Meeting progress tracking
-- Task delegation and completion flow
-- @mention alerts
-- Duplicate project names get auto-numbered: `project`, `project (1)`
+- **Current meeting as a thread** — speakers post comments, consensus stances are shown inline
+- **MVP progress panel** — which MVPs are pending / in-progress / done
+- **User comment box** — type a note straight into the meeting from the browser; the orchestrator picks it up at the next round boundary (file-queue routed to `docs/open-coleslaw/.pending-comments.jsonl`)
+- **Terminal comments also work** — if you prompt Claude Code while a meeting is in progress, your prompt becomes a user turn in the thread
+- Per-project tabs (multiple terminals → multiple tabs); duplicate names auto-number: `project`, `project (1)`
 
 ### Self-Extending
 
@@ -162,10 +175,10 @@ Ask for a workflow that doesn't exist yet, and the orchestrator creates it — n
 
 | Tier | Model | Role |
 |------|-------|------|
-| Orchestrator | claude-opus-4-6 (1M) | Full-picture routing, delegation, judgment |
-| Leader | claude-sonnet-4-6 | Meetings, technical decisions |
-| Worker | claude-sonnet-4-6 | Code, implementation |
-| Research Worker | claude-haiku-4-5 | Quick lookups, exploration |
+| Orchestrator | claude-opus (1M context) | Full-picture routing, delegation, judgment |
+| Leader (specialists) | claude-sonnet | Meetings, technical decisions |
+| Worker | claude-sonnet | Code, implementation |
+| Research Worker | claude-haiku | Quick lookups, exploration |
 
 ## Philosophy
 
@@ -176,10 +189,10 @@ Coleslaw is a side dish that's already made. You don't prepare it — you just e
 ### Key Decisions
 
 - **The Orchestrator is your proxy, not a CEO.** You are the decision-maker. The orchestrator acts on your behalf but escalates important choices via @mention.
-- **Meeting first, always.** Even "simple" requests go through the pipeline. If it's truly simple, the meeting will be fast.
-- **MVP cycles.** Work happens in loops: meeting → develop → verify → (re-meet if needed).
-- **Rules survive context compaction.** The `using-open-coleslaw` skill is injected at every session start. The system never forgets how to behave.
-- **Agents check before they code.** Every agent analyzes the project's dependencies, existing code, and conventions before writing anything.
+- **Kickoff first.** Every non-trivial request starts by breaking itself into ordered MVPs.
+- **Consensus, not round count.** A meeting ends when everyone actually agrees (or you are asked to break a tie).
+- **Minutes are the real artifact.** They survive `/compact` and `/clear` — your Claude Code context is disposable.
+- **Agents check before they code.** Every specialist reads the project's state before proposing anything.
 
 ## Development
 
@@ -192,7 +205,7 @@ npm run build
 # Run with mock agents (no Claude CLI needed)
 COLESLAW_MOCK=1 node dist/index.js
 
-# Run tests (218 tests)
+# Run tests
 npm test
 
 # Type check

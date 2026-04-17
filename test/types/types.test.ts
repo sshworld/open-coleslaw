@@ -38,13 +38,14 @@ describe('type constants', () => {
   });
 
   describe('DEPARTMENT_TOOLS', () => {
-    it('should have all 5 departments defined', () => {
+    it('should have all 6 departments defined', () => {
+      expect(DEPARTMENT_TOOLS).toHaveProperty('planning');
       expect(DEPARTMENT_TOOLS).toHaveProperty('architecture');
       expect(DEPARTMENT_TOOLS).toHaveProperty('engineering');
-      expect(DEPARTMENT_TOOLS).toHaveProperty('qa');
+      expect(DEPARTMENT_TOOLS).toHaveProperty('verification');
       expect(DEPARTMENT_TOOLS).toHaveProperty('product');
       expect(DEPARTMENT_TOOLS).toHaveProperty('research');
-      expect(Object.keys(DEPARTMENT_TOOLS)).toHaveLength(5);
+      expect(Object.keys(DEPARTMENT_TOOLS)).toHaveLength(6);
     });
 
     it('should have non-empty tool arrays for each department', () => {
@@ -66,8 +67,8 @@ describe('type constants', () => {
       expect(DEPARTMENT_TOOLS.engineering).toContain('Bash');
     });
 
-    it('should give qa the Bash tool for test running', () => {
-      expect(DEPARTMENT_TOOLS.qa).toContain('Bash');
+    it('should give verification the Bash tool for test running', () => {
+      expect(DEPARTMENT_TOOLS.verification).toContain('Bash');
     });
 
     it('should give research the WebSearch tool', () => {

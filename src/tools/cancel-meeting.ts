@@ -7,7 +7,6 @@ import {
   listWorkersByLeader,
   updateWorker,
 } from '../storage/index.js';
-import { eventBus } from '../orchestrator/event-bus.js';
 
 export const cancelMeetingSchema = {
   meetingId: z.string().describe('ID of the meeting to cancel'),
@@ -70,13 +69,6 @@ export async function cancelMeetingHandler({
       if (agent.status !== 'completed' && agent.status !== 'failed') {
         updateAgent(agent.id, { status: 'completed', completedAt: Date.now() });
         agentsCancelled++;
-
-        eventBus.emitAgentEvent({
-          kind: 'state_changed',
-          agentId: agent.id,
-          from: agent.status,
-          to: 'completed',
-        });
       }
 
       // Find all workers for this agent (leader) and mark them as failed
@@ -89,12 +81,6 @@ export async function cancelMeetingHandler({
             completedAt: Date.now(),
           });
           workersFailed++;
-
-          eventBus.emitAgentEvent({
-            kind: 'task_completed',
-            agentId: worker.id,
-            result: 'failure',
-          });
         }
       }
     }

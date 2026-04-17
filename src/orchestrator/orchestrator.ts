@@ -22,6 +22,10 @@ import { logger } from '../utils/logger.js';
 // ---------------------------------------------------------------------------
 
 const DEPARTMENT_KEYWORDS: Record<Department, string[]> = {
+  planning: [
+    // Planning is always attached; keywords are mostly a no-op.
+    'meeting', 'plan', 'mvp', 'roadmap',
+  ],
   architecture: [
     'architecture', 'design', 'schema', 'api', 'data model', 'module',
     'interface', 'contract', 'coupling', 'dependency graph', 'adr',
@@ -32,10 +36,10 @@ const DEPARTMENT_KEYWORDS: Record<Department, string[]> = {
     'develop', 'function', 'class', 'module', 'write', 'create',
     'modify', 'update', 'delete', 'crud', 'endpoint', 'migration',
   ],
-  qa: [
+  verification: [
     'test', 'quality', 'security', 'performance', 'audit', 'coverage',
     'regression', 'benchmark', 'vulnerability', 'pen test', 'lint',
-    'assertion', 'e2e', 'integration test', 'unit test',
+    'assertion', 'e2e', 'integration test', 'unit test', 'verify',
   ],
   product: [
     'requirements', 'user', 'story', 'priority', 'acceptance criteria',
@@ -53,11 +57,14 @@ const DEPARTMENT_KEYWORDS: Record<Department, string[]> = {
 // StartMeeting options & result
 // ---------------------------------------------------------------------------
 
+export type MeetingType = 'kickoff' | 'design' | 'verify-retry';
+
 export interface StartMeetingOptions {
   topic: string;
   agenda: string[];
   departments?: Department[];
   previousMeetingId?: string | null;
+  meetingType?: MeetingType;
 }
 
 export interface StartMeetingResult {
@@ -65,6 +72,7 @@ export interface StartMeetingResult {
   departments: Department[];
   agenda: string[];
   topic: string;
+  meetingType: MeetingType;
 }
 
 // ---------------------------------------------------------------------------
@@ -116,6 +124,7 @@ export class Orchestrator {
     const scores = new Map<Department, number>();
 
     for (const [dept, keywords] of Object.entries(DEPARTMENT_KEYWORDS) as [Department, string[]][]) {
+      if (dept === 'planning') continue; // planner always attends; don't score
       let score = 0;
       for (const kw of keywords) {
         if (corpus.includes(kw)) {
@@ -131,21 +140,22 @@ export class Orchestrator {
       // Fallback: complex topics (3+ agenda items) get architecture + engineering;
       // simple ones get engineering only.
       if (agenda.length >= 3) {
-        logger.debug('No keyword matches; defaulting to architecture + engineering (complex topic)', {
+        logger.debug('No keyword matches; defaulting to planning + architecture + engineering (complex topic)', {
           meetingId: topic,
         });
-        return ['architecture', 'engineering'];
+        return ['planning', 'architecture', 'engineering'];
       }
-      logger.debug('No keyword matches; defaulting to engineering only (simple topic)', {
+      logger.debug('No keyword matches; defaulting to planning + engineering only (simple topic)', {
         meetingId: topic,
       });
-      return ['engineering'];
+      return ['planning', 'engineering'];
     }
 
-    // Sort by score descending and take all with hits
-    const selected = [...scores.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .map(([dept]) => dept);
+    // Sort by score descending and take all with hits. Planner always first.
+    const selected: Department[] = ['planning'];
+    for (const [dept] of [...scores.entries()].sort((a, b) => b[1] - a[1])) {
+      selected.push(dept);
+    }
 
     logger.debug(`Selected departments: ${selected.join(', ')}`, { meetingId: topic });
 
@@ -163,9 +173,13 @@ export class Orchestrator {
    */
   startMeeting(opts: StartMeetingOptions): StartMeetingResult {
     const { topic, agenda } = opts;
-    const departments = opts.departments ?? this.selectLeaders(topic, agenda);
+    const meetingType: MeetingType = opts.meetingType ?? 'design';
+    const departments =
+      opts.departments ?? this.selectParticipantsForType(meetingType, topic, agenda);
 
-    logger.info(`Creating meeting: "${topic}" with departments: [${departments.join(', ')}]`);
+    logger.info(
+      `Creating ${meetingType} meeting: "${topic}" with departments: [${departments.join(', ')}]`,
+    );
 
     // Create the meeting record
     const meetingId = uuidv4();
@@ -186,7 +200,29 @@ export class Orchestrator {
       departments,
       agenda,
       topic,
+      meetingType,
     };
+  }
+
+  /**
+   * Pick participants based on the meeting type. Planner always attends.
+   * Callers may still override with an explicit departments list.
+   */
+  selectParticipantsForType(
+    meetingType: MeetingType,
+    topic: string,
+    agenda: string[],
+  ): Department[] {
+    if (meetingType === 'kickoff') {
+      const corpus = `${topic} ${agenda.join(' ')}`.toLowerCase();
+      const fuzzy = corpus.length < 40 || /unclear|vague|explore|what should/.test(corpus);
+      return fuzzy ? ['planning', 'product'] : ['planning'];
+    }
+    if (meetingType === 'verify-retry') {
+      return ['planning', 'engineering', 'verification'];
+    }
+    // design: fall back to keyword-driven selection
+    return this.selectLeaders(topic, agenda);
   }
 
   // ---- chain meeting -------------------------------------------------------

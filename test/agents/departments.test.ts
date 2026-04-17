@@ -19,11 +19,18 @@ describe('getDepartment', () => {
     expect(eng.allowedTools).toContain('Bash');
   });
 
-  it('returns qa department', () => {
-    const qa = getDepartment('qa');
-    expect(qa.name).toBe('qa');
-    expect(qa.leaderRole).toBe('qa');
-    expect(qa.allowedTools).toContain('Bash');
+  it('returns verification department', () => {
+    const verification = getDepartment('verification');
+    expect(verification.name).toBe('verification');
+    expect(verification.leaderRole).toBe('verifier');
+    expect(verification.allowedTools).toContain('Bash');
+  });
+
+  it('returns planning department', () => {
+    const planning = getDepartment('planning');
+    expect(planning.name).toBe('planning');
+    expect(planning.leaderRole).toBe('planner');
+    expect(planning.allowedTools).toContain('Read');
   });
 
   it('returns product department', () => {
@@ -46,13 +53,14 @@ describe('getDepartment', () => {
 });
 
 describe('getAllDepartments', () => {
-  it('returns all 5 departments', () => {
+  it('returns all 6 departments', () => {
     const all = getAllDepartments();
-    expect(all).toHaveLength(5);
+    expect(all).toHaveLength(6);
     const names = all.map((d) => d.name);
+    expect(names).toContain('planning');
     expect(names).toContain('architecture');
     expect(names).toContain('engineering');
-    expect(names).toContain('qa');
+    expect(names).toContain('verification');
     expect(names).toContain('product');
     expect(names).toContain('research');
   });
@@ -67,8 +75,12 @@ describe('getDepartmentForRole', () => {
     expect(getDepartmentForRole('engineer')).toBe('engineering');
   });
 
-  it('resolves qa-leader to qa', () => {
-    expect(getDepartmentForRole('qa')).toBe('qa');
+  it('resolves verifier to verification', () => {
+    expect(getDepartmentForRole('verifier')).toBe('verification');
+  });
+
+  it('resolves planner to planning', () => {
+    expect(getDepartmentForRole('planner')).toBe('planning');
   });
 
   it('resolves pm-leader to product', () => {

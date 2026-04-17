@@ -1,55 +1,74 @@
 {
   "meetingTypes": {
+    "kickoff": {
+      "description": "Decompose a user request into ordered MVPs",
+      "defaultDepartments": ["planning", "product"],
+      "defaultAgenda": [
+        "Restate user request",
+        "Decompose into ordered MVPs",
+        "Confirm first MVP scope"
+      ],
+      "maxRoundsPerItem": 10
+    },
+    "design": {
+      "description": "Design a single MVP: decide approach, scope, acceptance criteria",
+      "defaultDepartments": ["planning", "architecture", "engineering", "verification"],
+      "defaultAgenda": [
+        "Review MVP goal and scope",
+        "Evaluate design options",
+        "Decide approach and acceptance criteria"
+      ],
+      "maxRoundsPerItem": 10
+    },
+    "verify-retry": {
+      "description": "Respond to verification failure and plan a fix",
+      "defaultDepartments": ["planning", "engineering", "verification"],
+      "defaultAgenda": [
+        "Review failure details",
+        "Diagnose root cause",
+        "Agree on fix and updated acceptance criteria"
+      ],
+      "maxRoundsPerItem": 10
+    },
     "design-review": {
-      "description": "Review system or feature design",
-      "defaultDepartments": ["architecture", "engineering"],
+      "description": "Review an existing system or feature design",
+      "defaultDepartments": ["planning", "architecture", "engineering"],
       "defaultAgenda": [
         "Review requirements",
         "Evaluate design options",
         "Decide on approach"
       ],
-      "maxRoundsPerItem": 3
+      "maxRoundsPerItem": 10
     },
     "code-review": {
       "description": "Review code changes for quality, correctness, and conventions",
-      "defaultDepartments": ["engineering", "qa"],
+      "defaultDepartments": ["planning", "engineering", "verification"],
       "defaultAgenda": [
         "Review changed files and diffs",
         "Check correctness and edge cases",
         "Assess test coverage and style compliance"
       ],
-      "maxRoundsPerItem": 2
+      "maxRoundsPerItem": 10
     },
     "sprint-planning": {
       "description": "Plan work items for the upcoming sprint",
-      "defaultDepartments": ["product", "engineering", "architecture"],
+      "defaultDepartments": ["planning", "product", "engineering", "architecture"],
       "defaultAgenda": [
         "Review backlog and priorities",
         "Estimate effort for candidate items",
         "Commit to sprint scope"
       ],
-      "maxRoundsPerItem": 3
+      "maxRoundsPerItem": 10
     },
     "bug-triage": {
       "description": "Triage and prioritize reported bugs",
-      "defaultDepartments": ["engineering", "qa", "product"],
+      "defaultDepartments": ["planning", "engineering", "verification", "product"],
       "defaultAgenda": [
         "Review reported bugs",
         "Assess severity and impact",
         "Assign owners and priorities"
       ],
-      "maxRoundsPerItem": 2
-    },
-    "feature-kickoff": {
-      "description": "Kick off a new feature with cross-department alignment",
-      "defaultDepartments": ["product", "architecture", "engineering", "qa"],
-      "defaultAgenda": [
-        "Present feature requirements and user stories",
-        "Discuss architectural approach",
-        "Define implementation plan and milestones",
-        "Establish acceptance criteria and test strategy"
-      ],
-      "maxRoundsPerItem": 3
+      "maxRoundsPerItem": 10
     }
   }
 }

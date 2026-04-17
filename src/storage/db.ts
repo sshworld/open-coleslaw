@@ -94,6 +94,18 @@ const MIGRATIONS: string[] = [
     payload TEXT NOT NULL,
     created_at INTEGER NOT NULL
   )`,
+
+  `CREATE TABLE IF NOT EXISTS mvps (
+    id TEXT PRIMARY KEY,
+    kickoff_meeting_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    goal TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'in-progress', 'done', 'blocked')),
+    order_index INTEGER NOT NULL,
+    design_meeting_id TEXT,
+    created_at INTEGER NOT NULL,
+    completed_at INTEGER
+  )`,
 ];
 
 function applyMigrations(database: DatabaseType): void {

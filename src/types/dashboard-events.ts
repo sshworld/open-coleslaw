@@ -1,50 +1,114 @@
-import type { AgentStatus, AgentTier } from './agent.js';
 import type { MeetingPhase } from './meeting.js';
 
-export interface AgentState {
-  id: string;
-  type: AgentTier;
-  label: string;
-  status: AgentStatus;
-  parentId: string | null;
-  department: string;
-  currentTask: string | null;
-  costUsd: number;
+// ---------------------------------------------------------------------------
+// Meeting thread model — replaces the old agent-graph model
+// ---------------------------------------------------------------------------
+
+export type MeetingType = 'kickoff' | 'design' | 'verify-retry';
+
+export type MeetingThreadStatus =
+  | 'in-progress'
+  | 'awaiting-consensus'
+  | 'completed'
+  | 'escalated';
+
+export type Stance = 'agree' | 'disagree' | 'speaking';
+
+export interface ThreadComment {
+  id: number;
+  speakerRole: string; // 'planner' | 'architect' | ... | 'user'
+  agendaItemIndex: number;
+  roundNumber: number;
+  content: string;
+  stance: Stance;
+  createdAt: number;
 }
 
-export interface EdgeState {
+export interface MvpSummary {
   id: string;
-  source: string;
-  target: string;
-  edgeType: 'hierarchy' | 'delegation' | 'report' | 'message' | 'mention';
-  active: boolean;
-  label: string;
+  title: string;
+  goal: string;
+  status: 'pending' | 'in-progress' | 'done' | 'blocked';
+  orderIndex: number;
 }
 
-export interface MeetingState {
+export interface MeetingThread {
   meetingId: string;
-  phase: MeetingPhase;
+  meetingType: MeetingType;
+  topic: string;
+  agenda: string[];
   participants: string[];
+  status: MeetingThreadStatus;
+  phase: MeetingPhase;
+  comments: ThreadComment[];
+  mvps: MvpSummary[]; // populated on kickoff meetings or carried alongside
+  decisions: string[]; // populated after synthesis
+  actionItems: string[]; // populated after synthesis
   startedAt: number;
+  completedAt: number | null;
 }
 
-export type DashboardEvent =
-  | { type: 'snapshot'; agents: AgentState[]; edges: EdgeState[]; meeting: MeetingState | null }
-  | { type: 'delta'; timestamp: number; events: AgentEvent[] };
+// ---------------------------------------------------------------------------
+// Events (server → browser)
+// ---------------------------------------------------------------------------
 
 export type AgentEvent =
-  | { kind: 'agent_spawned'; agentId: string; agentType: AgentTier; parentId: string | null; label: string; department: string }
-  | { kind: 'agent_destroyed'; agentId: string }
-  | { kind: 'state_changed'; agentId: string; from: AgentStatus; to: AgentStatus }
-  | { kind: 'task_assigned'; agentId: string; taskSummary: string }
-  | { kind: 'task_completed'; agentId: string; result: 'success' | 'failure' }
-  | { kind: 'message_sent'; fromId: string; toId: string; summary: string }
-  | { kind: 'mention_created'; mentionId: string; summary: string; urgency: 'blocking' | 'advisory' }
-  | { kind: 'mention_resolved'; mentionId: string; decision: string }
+  | {
+      kind: 'meeting_started';
+      meetingId: string;
+      meetingType: MeetingType;
+      topic: string;
+      agenda: string[];
+      participants: string[];
+    }
+  | {
+      kind: 'transcript_added';
+      meetingId: string;
+      comment: ThreadComment;
+    }
+  | {
+      kind: 'round_advanced';
+      meetingId: string;
+      roundNumber: number;
+      agendaItemIndex: number;
+    }
+  | {
+      kind: 'consensus_checked';
+      meetingId: string;
+      allAgreed: boolean;
+      stances: Array<{ role: string; stance: Stance; reason?: string }>;
+    }
+  | {
+      kind: 'minutes_finalized';
+      meetingId: string;
+      decisions: string[];
+      actionItems: string[];
+    }
+  | {
+      kind: 'user_comment_added';
+      meetingId: string;
+      content: string;
+      source: 'terminal' | 'browser';
+    }
+  | {
+      kind: 'mvp_progress';
+      mvps: MvpSummary[];
+    }
+  | {
+      kind: 'mention_created';
+      mentionId: string;
+      summary: string;
+      urgency: 'blocking' | 'advisory';
+    }
+  | {
+      kind: 'mention_resolved';
+      mentionId: string;
+      decision: string;
+    }
   | { kind: 'cost_update'; totalCost: number };
 
 // ---------------------------------------------------------------------------
-// Multi-session types
+// Multi-session types (dashboard owner + remote MCP clients)
 // ---------------------------------------------------------------------------
 
 export interface ProjectSession {
@@ -73,22 +137,33 @@ export interface UnregisterMessage {
   sessionId: string;
 }
 
-export type ServerMessage = RegisterMessage | SessionEventMessage | UnregisterMessage;
+export interface UserCommentMessage {
+  type: 'user-comment';
+  sessionId: string;
+  meetingId: string;
+  content: string;
+}
+
+export type ServerMessage =
+  | RegisterMessage
+  | SessionEventMessage
+  | UnregisterMessage
+  | UserCommentMessage;
+
+export interface SessionSnapshot {
+  sessionId: string;
+  displayName: string;
+  projectPath: string;
+  isActive: boolean;
+  currentMeeting: MeetingThread | null;
+  pastMeetings: MeetingThread[]; // last N finished threads
+  mvps: MvpSummary[];
+  totalCost: number;
+}
 
 export interface MultiSessionSnapshot {
   type: 'multi-snapshot';
-  sessions: Array<{
-    sessionId: string;
-    displayName: string;
-    projectPath: string;
-    isActive: boolean;
-    snapshot: {
-      agents: AgentState[];
-      edges: EdgeState[];
-      meeting: MeetingState | null;
-      totalCost: number;
-    };
-  }>;
+  sessions: SessionSnapshot[];
 }
 
 export interface SessionDelta {

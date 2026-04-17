@@ -1,7 +1,6 @@
 export { startMeetingSchema, startMeetingHandler } from './start-meeting.js';
 export { getMeetingStatusSchema, getMeetingStatusHandler } from './get-meeting-status.js';
 export { getMinutesSchema, getMinutesHandler } from './get-minutes.js';
-export { compactMinutesSchema, compactMinutesHandler } from './compact-minutes.js';
 export { executeTasksSchema, executeTasksHandler } from './execute-tasks.js';
 export { getAgentTreeHandler } from './get-agent-tree.js';
 export { respondToMentionSchema, respondToMentionHandler } from './respond-to-mention.js';

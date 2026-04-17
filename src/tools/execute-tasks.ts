@@ -26,7 +26,7 @@ export async function executeTasksHandler({
             type: 'text',
             text: JSON.stringify(
               {
-                error: `No tasks found for meeting: ${meetingId}. Run compact-minutes first.`,
+                error: `No tasks found for meeting: ${meetingId}. Ensure the meeting's minutes include action items.`,
               },
               null,
               2,

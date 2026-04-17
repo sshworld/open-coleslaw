@@ -4,7 +4,7 @@ import { MeetingProtocol } from '../../src/meeting/protocol.js';
 describe('MeetingProtocol', () => {
   const meetingId = 'meeting-001';
   const agenda = ['Design the API', 'Review dependencies', 'Plan testing strategy'];
-  const participants = ['architect', 'engineer', 'qa'];
+  const participants = ['architect', 'engineer', 'verifier'];
   let protocol: MeetingProtocol;
 
   beforeEach(() => {
@@ -39,7 +39,7 @@ describe('MeetingProtocol', () => {
     it('cycles through participants round-robin', () => {
       expect(protocol.getNextSpeaker()).toBe('architect');
       expect(protocol.getNextSpeaker()).toBe('engineer');
-      expect(protocol.getNextSpeaker()).toBe('qa');
+      expect(protocol.getNextSpeaker()).toBe('verifier');
       // Wraps around
       expect(protocol.getNextSpeaker()).toBe('architect');
     });

@@ -184,7 +184,7 @@ export class MinutesGenerator {
           id: uuidv4(),
           title: `Action ${actionCounter}: ${meeting.agenda[i]}`,
           description: actionText,
-          assignedDepartment: 'engineering', // default; compactor refines this
+          assignedDepartment: 'engineering', // default; planner's structured output overrides
           assignedRole: 'engineer',
           priority: 'medium',
           dependencies: [],
