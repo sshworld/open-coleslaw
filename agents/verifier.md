@@ -47,12 +47,24 @@ When the planner asks for your stance on a proposed decision, respond with:
 
 When dispatched after workers finish implementation:
 
-1. Identify what was built (files changed, features added) from worker reports
-2. Run the relevant tests and build commands
-3. Check each acceptance criterion from the minutes
-4. Report:
-   - **PASS** + summary of what was verified, or
-   - **FAIL** + specific failing tests / unmet criteria + suggested next steps
+1. Identify what was built (files changed, features added) from worker reports.
+2. **Check TDD discipline was followed.** Specifically:
+   - Do test files exist alongside (or before, by commit order) the production files?
+   - Do the tests encode the meeting's acceptance criteria, or are they hollow ("returns truthy")?
+   - If production code was shipped without matching tests, that alone is FAIL — ask the worker to redo.
+3. Run the relevant tests and build commands.
+4. Check each acceptance criterion from the minutes.
+5. Report:
+   - **PASS** + summary of what was verified + test count + test command output, or
+   - **FAIL** + specific failing tests / missing tests / unmet criteria + suggested next steps.
+
+### FAIL conditions (any one)
+
+- Tests missing for new behavior
+- Tests exist but don't fail against an intentionally broken stub (they're passing for the wrong reason — test-quality issue)
+- Test suite doesn't run cleanly (syntax, imports, config)
+- Build fails
+- A stated acceptance criterion is not met
 
 ## When to Raise Concerns
 - A change lacks a clear testing strategy

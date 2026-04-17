@@ -92,6 +92,37 @@ Specialist roles: `planner`, `architect`, `engineer`, `verifier`, `product-manag
 - Mock mode: set COLESLAW_MOCK=1 for development without Claude CLI
 - Node.js >= 18 required
 
+## TDD is the default (v0.6.1+)
+
+Before modifying anything under `src/`, `agents/`, or `skills/`:
+
+1. **Write the test or structural assertion first.**
+   - `src/` logic → vitest test that fails because the code doesn't yet exist
+   - plugin structure (agent files present/absent, skill contents, frontmatter) →
+     add/extend `test/plugin-structure.test.ts` with a failing assertion
+2. **Run tests. The new one must fail.** If it passes, the test is wrong — it's not
+   actually asserting the new behavior.
+3. **Implement until the test goes green.** No extra scope.
+4. **Refactor if useful, with tests still green.**
+5. **Commit the test and the implementation together.**
+
+### Scope of tests
+
+Unit-testable (TDD fully applies):
+- MCP tool handlers (input validation, SQLite writes, event bus emission)
+- Storage CRUD, state-bridge event application, type invariants
+- Plugin structure (agent files, skill strings, frontmatter, marketplace.json version alignment)
+
+Not unit-testable (vitest can't verify):
+- Whether Claude's LLM actually dispatches specialists instead of role-playing them
+- Whether meeting minutes end up in the user's language
+- Whether the dashboard renders correctly in a browser
+
+For those, **runtime behavior is verified via manual smoke tests documented in
+`docs/smoke-tests.md`**. `npm test` passing is NEVER proof that a release works
+end-to-end — the smoke-test checklist has to pass in a real session before calling
+a version "ready".
+
 ## Key Decisions
 - **Flat dispatch (v0.6.0+)** — main Claude session runs the whole pipeline
   directly. No `orchestrator` subagent. Every speaker turn is a real
