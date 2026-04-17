@@ -117,6 +117,25 @@ describe('plugin structure — skills', () => {
     expect(md.toLowerCase()).toMatch(/auto-loop|do not prompt|without asking/);
     expect(md.toLowerCase()).toMatch(/only after the (last|final) mvp/);
   });
+
+  it('using-open-coleslaw skill mandates planner in every meeting (v0.6.3)', () => {
+    const md = readFileSync(join(SKILLS, 'using-open-coleslaw', 'SKILL.md'), 'utf-8');
+    // Mandatory planner language
+    expect(md.toLowerCase()).toMatch(/planner is mandatory|mandatory.*planner|planner.*mandatory/);
+    // Must state the three dispatch points (opening / consensus / synthesis)
+    expect(md.toLowerCase()).toMatch(/opening/);
+    expect(md.toLowerCase()).toMatch(/consensus/);
+    expect(md.toLowerCase()).toMatch(/synthesis/);
+    // Must forbid skipping meetings for "continue with MVP N" prompts
+    expect(md).toMatch(/every MVP/i);
+    expect(md).toMatch(/its own (full )?design meeting/i);
+  });
+
+  it('meeting skill also mandates planner in every meeting', () => {
+    const md = readFileSync(join(SKILLS, 'meeting', 'SKILL.md'), 'utf-8');
+    expect(md.toLowerCase()).toMatch(/planner is mandatory|mandatory.*planner|planner.*mandatory/);
+    expect(md).toMatch(/every MVP/i);
+  });
 });
 
 describe('plugin structure — version alignment', () => {

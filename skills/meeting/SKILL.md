@@ -9,6 +9,10 @@ description: "Use for ANY user request involving building, creating, designing, 
 
 One speaker turn = one `Agent` call with the specialist's `subagent_type`, followed by one `add-transcript` call that records what they said. That's how the dashboard and the minutes file get real multi-agent dialog instead of a single agent's monologue.
 
+**Planner is mandatory in every meeting.** Dispatch `open-coleslaw:planner` at least three times per meeting: once to open, once at each consensus check (at least one per meeting), and once for synthesis. A meeting with zero planner dispatches is invalid — restart it. This applies to kickoff, design, and verify-retry meetings alike.
+
+**Every MVP needs its own design meeting.** Even if the user says "just do MVP 2-5" or "continue with the rest", you still run a full design meeting per MVP before any implementation. Kickoff only decomposed the request into MVP titles; the actual design decisions come from the per-MVP design meetings.
+
 ## Quick runbook
 
 1. `start-meeting({ topic, agenda, meetingType: "kickoff" | "design" | "verify-retry" })` — captures `meetingId`.

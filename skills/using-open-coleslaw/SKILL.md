@@ -61,17 +61,28 @@ Break the user's request into ordered MVPs.
 
 ## Phase 2 — Design Meeting (per MVP)
 
+**EVERY MVP gets its own design meeting.** Even if the user said "just do MVP 2~5" or "continue with the rest". Do NOT short-circuit to Phase 4 (implementation) because you think the kickoff already contains enough detail — the kickoff only produced high-level MVP titles and scope notes; the actual design decisions (files, tasks, acceptance criteria) only exist after a design meeting.
+
+**PLANNER IS MANDATORY.** Every design meeting MUST dispatch `open-coleslaw:planner` AT LEAST three times:
+
+1. **Opening** — planner states the agenda and target MVP scope.
+2. **Each consensus check** — planner queries participant stances after every round.
+3. **Synthesis** — planner writes the final minutes.
+
+If you close a meeting without any `Agent(open-coleslaw:planner ...)` dispatch, that meeting is invalid — discard and restart. No exceptions.
+
 For the current MVP:
 
 1. Call `start-meeting` with `meetingType: "design"` and an agenda list relevant to that MVP (4-6 items typical).
 2. Select participants dynamically:
-   - Always: `planner`.
+   - **Always**: `planner` (mandatory, see above).
    - Default: `architect`, `engineer`, `verifier`.
    - Add `product-manager` if requirements are still fuzzy.
    - Add `researcher` if prior art / library comparison is needed.
-   - Tiny fix: `planner + engineer + verifier` only.
-3. **Round loop — consensus-based termination, NOT fixed count**. For each round `r ∈ {1..MAX_ROUNDS}`, MAX_ROUNDS = 10:
-   a. For each participant in order (planner first when opening or summarizing; then domain specialists):
+   - Tiny fix: `planner + engineer + verifier` only. Planner is still required.
+3. **Opening**: dispatch `open-coleslaw:planner` to open the meeting. `add-transcript` the result with `agendaItemIndex: -1, roundNumber: 0, stance: "speaking"`.
+4. **Round loop — consensus-based termination, NOT fixed count**. For each round `r ∈ {1..MAX_ROUNDS}`, MAX_ROUNDS = 10:
+   a. For each domain specialist in order (architect → engineer → verifier → other convened specialists):
       ```
       Agent({
         subagent_type: "open-coleslaw:<role>",
@@ -85,12 +96,12 @@ For the current MVP:
       })
       ```
       After the response returns, immediately `add-transcript({ meetingId, speakerRole, agendaItemIndex, roundNumber: r, content, stance: "speaking" })`.
-   b. After the full round, run the **Consensus Check**: dispatch `open-coleslaw:planner` with the current transcript and ask each participant's stance. Then dispatch each specialist once more with the proposed decision and ask them to respond with exactly `AGREE` or `DISAGREE: <reason>`. `add-transcript` each response with `stance: "agree"` or `stance: "disagree"`.
+   b. **Consensus check (MANDATORY every round)**: dispatch `open-coleslaw:planner` to propose a concrete decision statement from this round's transcript. `add-transcript` the planner's proposal. Then dispatch each specialist ONCE more with that proposal and ask for exactly `AGREE` or `DISAGREE: <reason>`. `add-transcript` each response with `stance: "agree"` or `stance: "disagree"`. This consensus-check planner dispatch is required even in round 1.
    c. If all AGREE → exit the round loop. If any DISAGREE → next round focused on the disagreement.
    d. If `r == MAX_ROUNDS` and still no consensus → call the `respond-to-mention` MCP tool (or similar) to escalate to the user. Wait for decision.
-4. Dispatch `open-coleslaw:planner` in synthesis mode to produce the final minutes.
-5. `add-transcript` the synthesis output, then `generate-minutes`.
-6. Save the minutes to `<cwd>/docs/open-coleslaw/YYYY-MM-DD_<seq>_<mvp-slug>.md`. Update `INDEX.md`.
+5. **Synthesis (MANDATORY)**: dispatch `open-coleslaw:planner` in synthesis mode to produce the final minutes.
+6. `add-transcript` the synthesis output with `agendaItemIndex: -2, stance: "speaking"`, then `generate-minutes`.
+7. Save the minutes to `<cwd>/docs/open-coleslaw/YYYY-MM-DD_<seq>_<mvp-slug>.md`. Update `INDEX.md`.
 
 ## Phase 3 — Plan Mode
 
@@ -154,6 +165,8 @@ User turns are the highest-weight voice — update proposals immediately.
 | "Orchestrator subagent used to do this" | v0.6.0 removed that. You run the pipeline now. |
 | "Let me ask the user if they want to continue with MVP-2" | FORBIDDEN. Auto-loop until all MVPs done (v0.6.2). Only the user interrupting stops the pipeline mid-way. |
 | "I'll touch .cycle-complete because this MVP is done" | Only touch it after the LAST MVP. Between-MVP touches trigger the Stop hook prematurely. |
+| "The user said 'do MVP 2-5', I'll skip meetings and just implement" | FORBIDDEN. Every MVP needs its own full design meeting (planner + specialists + consensus + minutes) before Plan Mode. Kickoff only gave titles, not design decisions. |
+| "Planner is just a chair, I can summarize the meeting myself" | FORBIDDEN. Every meeting MUST include `Agent(open-coleslaw:planner ...)` dispatches at opening, each consensus check, and synthesis. If a meeting closes with zero planner dispatches, it is invalid — restart it. |
 | "Skip the kickoff for one-file change" | Always run kickoff. MVP list may have just one item. |
 | "User asked in Korean so I'll reply in English" | Match the user's language in every transcript and minute. |
 

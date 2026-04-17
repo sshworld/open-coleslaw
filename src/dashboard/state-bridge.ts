@@ -22,6 +22,7 @@ import type {
   SessionDelta,
 } from '../types/dashboard-events.js';
 import { logger } from '../utils/logger.js';
+import { hydratePastMeetings } from './minutes-hydrator.js';
 
 const MAX_PAST_MEETINGS = 20; // keep a longer history now that the UI supports browsing
 const EVENT_DEBOUNCE_MS = 100;
@@ -86,6 +87,29 @@ export class StateBridge extends EventEmitter {
     this.sessionToProject.set(info.sessionId, info.projectPath);
 
     logger.info(`Project registered: ${displayName} (${info.projectPath})`);
+
+    // Rehydrate past meetings from the on-disk minutes directory so the
+    // sidebar survives MCP server restarts. Fire-and-forget: we broadcast
+    // the rehydrated snapshot once it's ready instead of blocking register.
+    hydratePastMeetings(info.projectPath)
+      .then((past) => {
+        if (past.length === 0) return;
+        const current = this.projects.get(info.projectPath);
+        if (!current) return;
+        current.pastMeetings = past;
+        logger.info(
+          `Hydrated ${past.length} past meeting(s) for ${displayName}`,
+        );
+        // Nudge browsers: send an updated snapshot.
+        this.emit('broadcast', JSON.stringify(this.getSnapshot()));
+      })
+      .catch((err: unknown) => {
+        logger.warn(
+          `Failed to hydrate past meetings for ${displayName}: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      });
 
     this.emit(
       'broadcast',

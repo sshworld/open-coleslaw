@@ -26,13 +26,13 @@ During the run, watch the terminal transcript (Ctrl+O to expand). Expect to see
 at least one `Agent(...)` call per role in the terminal, NOT just one single
 `open-coleslaw:orchestrator(...)` wrapping the entire meeting.
 
-- [ ] Terminal shows `Agent(open-coleslaw:planner ...)` at least once
-- [ ] Terminal shows `Agent(open-coleslaw:architect ...)` at least once
-- [ ] Terminal shows `Agent(open-coleslaw:engineer ...)` at least once
-- [ ] Terminal shows `Agent(open-coleslaw:verifier ...)` at least once
+- [ ] Terminal shows `Agent(open-coleslaw:planner ...)` **multiple times per meeting** (opening + consensus check(s) + synthesis). v0.6.3 rule: at least **3 planner dispatches per design meeting**.
+- [ ] Terminal shows `Agent(open-coleslaw:architect ...)` at least once per meeting it participates in
+- [ ] Terminal shows `Agent(open-coleslaw:engineer ...)` at least once per meeting it participates in
+- [ ] Terminal shows `Agent(open-coleslaw:verifier ...)` at least once per meeting it participates in
 - [ ] Terminal does **NOT** show any `Agent(open-coleslaw:orchestrator ...)` — that agent was removed in v0.6.0
-- [ ] Each specialist's dispatch is immediately followed by an
-      `add-transcript` MCP call
+- [ ] Each specialist's dispatch is immediately followed by an `add-transcript` MCP call
+- [ ] **Continue-MVP prompts**: if the user says "do MVP 2~5" or "continue with the rest", the main session still runs a **full design meeting per MVP** (planner opens → specialists → consensus → synthesis). It does NOT skip to workers.
 
 If a specialist only appears as speech inside add-transcript without a matching
 `Agent(...)` dispatch above it, the main session is role-playing — ❌ fail.
@@ -59,6 +59,17 @@ OR after completion:
 - [ ] Clicking the past meeting swaps the main view to show that thread
 - [ ] A purple "Back to live meeting" banner appears
 - [ ] Clicking "Back to live meeting" returns to the current in-progress meeting
+
+**Restart persistence (v0.6.3):**
+
+- [ ] Kill Claude Code entirely, reopen it
+- [ ] New session → navigate to the same project (or open dashboard after
+      new session starts)
+- [ ] Past Meetings sidebar still lists the meetings from the previous
+      session (rehydrated from `docs/open-coleslaw/*.md` files on disk)
+- [ ] Clicking a rehydrated past meeting shows its topic / decisions /
+      action items (comments/dialog are NOT rehydrated — that's expected;
+      the file is the source of truth)
 
 ## 5. Plan Mode enters from the main session
 
