@@ -13,24 +13,36 @@ You type a prompt like *"Build me a balance game app"*. That's it.
 ```
 You: "Build me a balance game app"
 
-  Phase A  (orchestrator subagent)
-    → Kickoff meeting: planner breaks request into ordered MVPs
-    → Design meeting for MVP-1: round-robin, consensus-based termination
-    → PRD minutes saved to docs/open-coleslaw/
-    → Returns { minutesPaths, mvps, plan }
+  The main Claude session (acting as meeting runner) runs the whole pipeline:
 
-  Phase B  (main Claude session)
-    → Enters Plan Mode with the meeting's plan
-    → You approve (or request changes → verify-retry meeting)
-    → Workers write the code in parallel
-    → Verifier runs tests / build
-    → Pass → next MVP ·  Fail → verify-retry meeting
-    → All MVPs done → final report
+  ① Kickoff meeting
+     · Dispatches open-coleslaw:planner to decompose request into ordered MVPs
+     · Minutes written to docs/open-coleslaw/
+
+  ② Per MVP — Design meeting (round-robin, consensus-based)
+     · Dispatches open-coleslaw:architect → speech → add-transcript
+     · Dispatches open-coleslaw:engineer  → speech → add-transcript
+     · Dispatches open-coleslaw:verifier  → speech → add-transcript
+     · After each round, planner runs a consensus check (AGREE / DISAGREE)
+     · Repeats until everyone AGREEs (max 10 rounds, then @mention escalation)
+     · Planner synthesizes minutes → docs/open-coleslaw/
+
+  ③ Plan Mode
+     · EnterPlanMode → plan from minutes → user approves
+
+  ④ Implementation
+     · Dispatches N × open-coleslaw:worker in parallel
+
+  ⑤ Verification
+     · open-coleslaw:verifier runs tests / build
+     · PASS → next MVP · FAIL → verify-retry meeting → re-plan
+
+  ⑥ All MVPs done → touch .cycle-complete → final report
 ```
 
-Why 2 phases? `EnterPlanMode` only works in the main Claude session (not in
-dispatched subagents). So the orchestrator handles meetings, the main session
-handles Plan Mode + worker dispatch + verification.
+Every speaker turn is a **real** `Agent` dispatch. No role-playing. The
+dashboard at `localhost:35143` shows each specialist's actual comment appear
+in the thread as the main session dispatches them.
 
 You never call a tool. You never pick a department. You never manage an agent.
 
@@ -57,62 +69,60 @@ Design a REST API for a todo app
 
 You should see the orchestrator agent being dispatched and a kickoff meeting starting automatically.
 
-## The Pipeline (2-phase)
+## The Pipeline (flat)
 
-**Phase A — the orchestrator subagent runs meetings:**
-```
-Kickoff meeting (planner breaks request into MVPs)
-for each MVP:
-   Design meeting → consensus → Minutes
-```
-The orchestrator returns a structured `{ minutesPaths, mvps, plan }` result.
+There is no orchestrator subagent any more. The **main Claude session** runs
+the whole pipeline — dispatching planner + specialists one-by-one and collecting
+their real output into `add-transcript`. This is what makes "multi-agent" mean
+multi-agent: each speaker turn is a fresh `Agent` call with its own context, not
+one LLM role-playing every role.
 
-**Phase B — the main Claude session acts on the result:**
 ```
-EnterPlanMode → user approval → Workers (parallel) → Verifier → next MVP or retry
+Kickoff → per-MVP design meeting → Plan Mode → Workers → Verify → (loop)
 ```
 
-Verification failure on an MVP doesn't abort the cycle — the main session
-dispatches the orchestrator again for a focused `verify-retry` meeting and
-re-plans the fix.
+Verification failure doesn't abort the cycle — it opens a focused
+`verify-retry` meeting and re-plans the fix.
 
 When the whole cycle ends the orchestrator touches a marker file, and the `Stop` hook checks your context usage. If you're over ~30%, it suggests running `/compact` or `/clear` before the next task. Minutes on disk mean you lose nothing.
 
 ## The Agent Cast
 
 ```
-         ┌─────────────────┐
-         │   Orchestrator   │  ← Your proxy
-         │  (claude-opus)   │
-         └────────┬────────┘
-                  │
-          (Kickoff → per-MVP loop)
-                  │
-    ┌─────────────┼─────────────────────────────┐
-    ▼             ▼             ▼               ▼
-┌─────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
-│ Planner │ │ Architect│ │ Engineer │ │ Verifier │   dynamically convened +
-│(chair)  │ │          │ │          │ │          │   product-manager / researcher
-└─────────┘ └──────────┘ └──────────┘ └──────────┘
-                  │
-           Plan Mode → User approves
-                  │
-    ┌─────────────┼─────────────┐
-    ▼             ▼             ▼
-┌────────┐  ┌────────┐  ┌────────┐
-│Worker 1│  │Worker 2│  │Worker N│     ← Parallel implementation
-└────────┘  └────────┘  └────────┘
-                  │
-            Verifier runs tests
-            /                \
-         Pass               Fail → verify-retry meeting
-          ↓
-     Next MVP (or done)
+         ┌──────────────────────────┐
+         │  Main Claude session     │  ← You. Runs the pipeline directly.
+         │  (dispatches everyone)   │
+         └─────────┬────────────────┘
+                   │
+       Kickoff → per-MVP design loop
+                   │
+    ┌──────────────┼──────────────────────────────┐
+    ▼              ▼              ▼               ▼
+┌─────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
+│ Planner │  │ Architect│  │ Engineer │  │ Verifier │   + product-manager /
+│ (chair) │  │          │  │          │  │          │   researcher as needed
+└─────────┘  └──────────┘  └──────────┘  └──────────┘
+   Always        Dynamic       Dynamic      Dynamic
+                   │
+            Plan Mode → User approves
+                   │
+    ┌──────────────┼──────────────┐
+    ▼              ▼              ▼
+┌────────┐    ┌────────┐    ┌────────┐
+│Worker 1│    │Worker 2│ …  │Worker N│    ← Parallel implementation
+└────────┘    └────────┘    └────────┘
+                   │
+             Verifier runs tests
+             /                  \
+          Pass                 Fail → verify-retry meeting
+           ↓
+      Next MVP (or done)
 ```
 
-**7 Specialists**: Planner, Architect, Engineer, Verifier, Product Manager, Researcher, plus Worker (parallelized).
+**6 Specialist agents** (you dispatch each one yourself):
+Planner, Architect, Engineer, Verifier, Product Manager, Researcher. Plus Worker (parallelized for implementation).
 
-The **planner always attends** — they chair the meeting, run the round-robin, and drive consensus. Other specialists are convened dynamically based on the task.
+The **planner always attends** — chairs the meeting, runs the round-robin, drives consensus. Other specialists are convened dynamically based on the task.
 
 ## Meetings That Actually End on Agreement
 
@@ -142,11 +152,10 @@ This is deliberately slower than a fixed-round meeting — but each MVP ends wit
 | `get-cost-summary` | Tracks spend per agent/meeting/department |
 | `chain-meeting` | Links meetings — previous minutes feed the next |
 
-### 8 Agents (dispatched via the Agent tool)
+### 7 Agents (all dispatched by the main Claude session via the Agent tool)
 
 | Agent | Role |
 |-------|------|
-| `orchestrator` | Your proxy — manages the kickoff + per-MVP cycles |
 | `planner` | Runs the meeting, chairs rounds, checks consensus, synthesises minutes |
 | `architect` | System design, API contracts, schemas |
 | `engineer` | Implementation feasibility, code quality |
@@ -185,14 +194,14 @@ Ask for a workflow that doesn't exist yet, and the orchestrator creates it — n
 
 | Tier | Model | Role |
 |------|-------|------|
-| Orchestrator (subagent) | inherits from user session | Meeting runner |
-| Leader (specialists) | inherits from user session | Meeting participant |
-| Worker | inherits from user session | Implementation |
+| Meeting runner | inherits from user session | The main Claude session itself — dispatches everything |
+| Specialist subagent | inherits from user session | Dispatched per speaker turn |
+| Worker subagent | inherits from user session | Dispatched per implementation task |
 
-**No model is hard-coded.** Every agent — orchestrator, specialists, workers —
-runs on whatever model you've selected in your Claude Code session (Opus,
-Sonnet, Haiku, or anything Anthropic ships next). Switch models with `/model`
-and the whole pipeline follows.
+**No model is hard-coded.** Every specialist, every worker runs on whatever
+model you've selected in your Claude Code session (Opus, Sonnet, Haiku, or
+anything Anthropic ships next). Switch models with `/model` and the whole
+pipeline follows.
 
 ## Philosophy
 

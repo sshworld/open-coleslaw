@@ -3,7 +3,7 @@ name: verifier
 description: |
   Verification department leader for open-coleslaw meetings. Owns testing strategy,
   security review, edge cases, quality gates, and post-implementation verification runs.
-  Dispatched by the orchestrator when changes need quality assurance input or when an
+  Dispatched by the main Claude session (acting as meeting runner) when changes need quality assurance input or when an
   MVP cycle has reached the verification step.
 model: inherit
 ---

@@ -1,128 +1,160 @@
 ---
 name: using-open-coleslaw
-description: "Loaded automatically at session start. Establishes the 2-phase open-coleslaw pipeline: Phase A dispatches the orchestrator subagent to run meetings (kickoff + per-MVP design). Phase B is run by the main Claude session — reads the orchestrator's structured result, enters Plan Mode, gets user approval, dispatches workers, verifies."
+description: "Loaded automatically at session start. Establishes that YOU (the main Claude session) run the open-coleslaw pipeline directly: dispatch specialists one-by-one, collect their real transcripts, run consensus rounds, enter Plan Mode, dispatch workers, verify. No more nested orchestrator subagent — you ARE the meeting runner."
 ---
 
 # You have Open Coleslaw.
 
-Like coleslaw — it's already prepared. The user just types what they want. You handle the rest through a **2-phase pipeline** below.
+Like coleslaw — it's already prepared. The user just types what they want. **You** run the pipeline.
 
 <HARD-GATE>
 Do NOT write code, create files, run commands, or take ANY implementation action without first going through the pipeline. This applies to EVERY request regardless of perceived simplicity.
 
-Language: **respond and run meetings in the same language the user used** (ask in Korean → minutes in Korean).
+**Language**: respond and run meetings in the same language the user used (ask in Korean → minutes in Korean).
+
+**Transparency**: every speaker turn MUST be a real `Agent` dispatch to a specialist subagent (planner / architect / engineer / verifier / product-manager / researcher). Do NOT role-play specialists yourself by writing their speech into `add-transcript`. The whole point is that each specialist is a separate dispatch so the user sees real multi-agent dialog.
 </HARD-GATE>
 
-## Why 2 Phases?
+## Why You (Main Session) Run This
 
-`EnterPlanMode` / `ExitPlanMode` do NOT work from inside a dispatched subagent — only the **main** Claude session can enter Plan Mode. So we split:
+Previously we used an `orchestrator` subagent to run meetings. That turned into a single agent role-playing every specialist, which defeated the purpose. From v0.6.0 onward:
 
-- **Phase A (subagent)**: orchestrator runs the meetings. Produces minutes on disk + a structured result.
-- **Phase B (main session, YOU)**: receive the structured result, call `EnterPlanMode`, get user approval, dispatch workers, verify.
+- **You (the main Claude session) are the meeting runner.**
+- You dispatch `open-coleslaw:planner` for kickoff + round management + synthesis.
+- You dispatch `open-coleslaw:architect` / `:engineer` / `:verifier` / `:product-manager` / `:researcher` for domain input — one `Agent` call per speaker turn.
+- You call the MCP tools directly (`start-meeting`, `add-transcript`, `generate-minutes`, `chain-meeting`).
+- You call `EnterPlanMode` / `ExitPlanMode` (only the main session can).
+- You dispatch `open-coleslaw:worker` in parallel for implementation.
+- You call `open-coleslaw:verifier` for post-implementation verification.
 
-## Phase A — Dispatch the Orchestrator
+Yes, this fills your context with meeting transcripts. That's fine — the Stop hook suggests `/compact` or `/clear` when you finish a cycle. Minutes persist on disk.
 
-1. Dispatch `open-coleslaw:orchestrator` via the Agent tool:
+## Phase 1 — Kickoff Meeting
+
+Break the user's request into ordered MVPs.
+
+1. Detect the user's language from the prompt. Use that language throughout.
+2. Call MCP tool `start-meeting`:
    ```
-   Agent({
-     subagent_type: "open-coleslaw:orchestrator",
-     prompt: `<user's full request>
-
-     Project context:
-     - cwd: ${cwd}
-     - tech stack / git state / anything obvious
-     - Language: ${detected-language-of-user-request, e.g., Korean}
-
-     Run the full meeting pipeline:
-     1. Kickoff meeting → decompose into MVPs
-     2. Design meeting for MVP-1 → reach consensus → minutes
-     (Stop after MVP-1's design meeting. Do NOT write code. Do NOT call EnterPlanMode.)
-
-     Return a STRUCTURED result:
-     - minutesPaths: absolute paths to all minutes written under docs/open-coleslaw/
-     - mvps: [{title, goal, scope}]  — ordered list from the kickoff
-     - currentMvp: { title, goal }    — the MVP-1 we just designed
-     - plan: {
-         context: short summary of the design decisions,
-         files: list of files to create/modify,
-         tasks: ordered list of concrete implementation tasks for workers,
-         acceptance: verification criteria from the verifier,
-       }
-     `
+   start-meeting({
+     topic: "<one-line summary of the request in user's language>",
+     agenda: ["Decompose the request into ordered MVPs"],
+     meetingType: "kickoff"
    })
    ```
-
-2. The orchestrator runs meetings (round-robin, consensus-based), writes minutes to `docs/open-coleslaw/`, and returns the structured result.
-
-## Phase B — You Continue the Pipeline
-
-3. Parse the orchestrator's return value. Confirm minutes file exists.
-
-4. **Enter Plan Mode** with a plan built from `plan.context`, `plan.files`, `plan.tasks`, `plan.acceptance`:
-   - `EnterPlanMode`
-   - Write a concise plan file (Context / Files / Tasks / Verification sections)
-   - `ExitPlanMode` → user sees it and approves/rejects
-
-5. **On rejection**: re-dispatch orchestrator with `chain-meeting` semantics (pass previous meetingId + user feedback) to re-run the MVP-1 design meeting.
-
-6. **On approval**: dispatch `open-coleslaw:worker` agents in parallel (one per task from `plan.tasks`):
+   Capture the returned `meetingId`.
+3. Dispatch the planner:
    ```
-   Agent({ subagent_type: "open-coleslaw:worker", prompt: "<specific task>" })
+   Agent({
+     subagent_type: "open-coleslaw:planner",
+     prompt: `Mode: kickoff. Language: <user's language>.
+     User request: <full verbatim request>
+     Project context: cwd=<cwd>, stack=<stack notes>.
+     Produce an ordered MVP list per the planner prompt's kickoff output format.`
+   })
    ```
-   Wait for all to finish. Aggregate results.
+4. Take the planner's response, call `add-transcript({ meetingId, speakerRole: "planner", agendaItemIndex: 0, roundNumber: 1, content: <planner output>, stance: "speaking" })`.
+5. If requirements are fuzzy, also dispatch `open-coleslaw:product-manager` for clarification, then `add-transcript`.
+6. Call `generate-minutes({ meetingId })`.
+7. Save the minutes markdown to `<cwd>/docs/open-coleslaw/YYYY-MM-DD_kickoff_<slug>.md`. Update (or create) `<cwd>/docs/open-coleslaw/INDEX.md` with the MVP checklist.
+8. Briefly confirm the MVP list with the user in ≤3 lines (e.g., "MVP-1 Core Play / MVP-2 Categories / MVP-3 Share — starting with MVP-1").
 
-7. **Verify**: dispatch `open-coleslaw:verifier`:
-   ```
-   Agent({ subagent_type: "open-coleslaw:verifier", prompt: `
-     Acceptance criteria: ${plan.acceptance}
-     Worker results: ${aggregated}
-     Run tests / build. Report PASS or FAIL.
-   `})
-   ```
+## Phase 2 — Design Meeting (per MVP)
 
-8. **PASS** → move to next MVP: dispatch orchestrator again for MVP-2's design meeting (skip kickoff; orchestrator reads existing `docs/open-coleslaw/` to know the MVP list). Repeat Phase B.
+For the current MVP:
 
-   **FAIL** → dispatch orchestrator with `meetingType: verify-retry` for a focused fix meeting. Then re-plan (Phase B step 4), re-implement.
+1. Call `start-meeting` with `meetingType: "design"` and an agenda list relevant to that MVP (4-6 items typical).
+2. Select participants dynamically:
+   - Always: `planner`.
+   - Default: `architect`, `engineer`, `verifier`.
+   - Add `product-manager` if requirements are still fuzzy.
+   - Add `researcher` if prior art / library comparison is needed.
+   - Tiny fix: `planner + engineer + verifier` only.
+3. **Round loop — consensus-based termination, NOT fixed count**. For each round `r ∈ {1..MAX_ROUNDS}`, MAX_ROUNDS = 10:
+   a. For each participant in order (planner first when opening or summarizing; then domain specialists):
+      ```
+      Agent({
+        subagent_type: "open-coleslaw:<role>",
+        prompt: `Mode: design. Language: <user's lang>. MVP: <mvp title/goal>.
+        Current agenda: <agenda>. Current round: <r>.
+        Previous transcript for this meeting so far:
+        ---
+        <concat of every prior add-transcript content, ordered by createdAt>
+        ---
+        Provide your domain input per your agent prompt's output format.`
+      })
+      ```
+      After the response returns, immediately `add-transcript({ meetingId, speakerRole, agendaItemIndex, roundNumber: r, content, stance: "speaking" })`.
+   b. After the full round, run the **Consensus Check**: dispatch `open-coleslaw:planner` with the current transcript and ask each participant's stance. Then dispatch each specialist once more with the proposed decision and ask them to respond with exactly `AGREE` or `DISAGREE: <reason>`. `add-transcript` each response with `stance: "agree"` or `stance: "disagree"`.
+   c. If all AGREE → exit the round loop. If any DISAGREE → next round focused on the disagreement.
+   d. If `r == MAX_ROUNDS` and still no consensus → call the `respond-to-mention` MCP tool (or similar) to escalate to the user. Wait for decision.
+4. Dispatch `open-coleslaw:planner` in synthesis mode to produce the final minutes.
+5. `add-transcript` the synthesis output, then `generate-minutes`.
+6. Save the minutes to `<cwd>/docs/open-coleslaw/YYYY-MM-DD_<seq>_<mvp-slug>.md`. Update `INDEX.md`.
 
-9. **All MVPs done** → touch `docs/open-coleslaw/.cycle-complete` marker (this lets the Stop hook check context usage). Final summary to user.
+## Phase 3 — Plan Mode
+
+1. `EnterPlanMode`.
+2. Write a plan derived from the minutes' Decisions / Action Items / Acceptance Criteria:
+   - Context (why, in user's language)
+   - Files to create/modify
+   - Ordered tasks (one per worker)
+   - Acceptance / verification
+3. `ExitPlanMode` to present for user approval.
+4. **Rejected**: `chain-meeting` back to a focused design or verify-retry meeting based on feedback. Re-enter Phase 2.
+5. **Approved**: go to Phase 4.
+
+## Phase 4 — Implementation
+
+Dispatch `open-coleslaw:worker` in parallel — one per task:
+```
+Agent({ subagent_type: "open-coleslaw:worker", prompt: "<task + acceptance + language hint>" })
+```
+Wait for all to finish. Aggregate results.
+
+## Phase 5 — Verification
+
+```
+Agent({
+  subagent_type: "open-coleslaw:verifier",
+  prompt: `Mode: verify. Acceptance: <acceptance criteria from minutes>.
+  Worker reports: <aggregated>. Run tests/build. Report PASS or FAIL with evidence.`
+})
+```
+
+- **PASS**: mark MVP done in INDEX.md checklist. If more MVPs remain, loop back to Phase 2 with the next MVP. If none remain, touch `<cwd>/docs/open-coleslaw/.cycle-complete` (the Stop hook picks this up) and report to the user.
+- **FAIL**: `start-meeting({ meetingType: "verify-retry", topic: "<failure summary>" })`, dispatch planner + engineer + verifier for a focused fix discussion, reach consensus, return to Phase 3 with the revised plan.
+
+## User Comments Mid-Meeting
+
+Two channels inject user turns into the current meeting:
+
+- **Terminal**: if the user sends a prompt while you're mid-meeting, interpret it as a comment. `add-transcript({ speakerRole: "user", agendaItemIndex: -3, content: <prompt>, stance: "speaking" })` and incorporate into the next round.
+- **Browser queue**: before each round, read `<cwd>/docs/open-coleslaw/.pending-comments.jsonl`. For each unread line, `add-transcript` as the user. Then move consumed lines to `.pending-comments.consumed.jsonl`.
+
+User turns are the highest-weight voice — update proposals immediately.
 
 ## Red Flags — STOP
 
 | Thought | Reality |
 |---------|---------|
 | "This is just a small change" | Small changes compound. Use the pipeline. |
-| "Let me quickly fix this" | Meeting first. |
-| "I know what to write" | Specialists might disagree. Meet. |
-| "Skip the kickoff for one-file change" | Always run kickoff. MVP list may just be `[one item]`. |
-| "Orchestrator said do X, let me just do X" | No — enter Plan Mode first, get user approval. |
-| "User asked in English/Korean so write minutes in English" | **Write minutes in the user's language.** |
-
-## Agent Dispatch Summary
-
-```
-You (main Claude session)
-  │
-  ├── Phase A: Agent({ subagent_type: "open-coleslaw:orchestrator", ... })
-  │     └── inside subagent:
-  │           ├── start-meeting (kickoff)
-  │           ├── dispatch open-coleslaw:planner
-  │           ├── generate-minutes → save to docs/open-coleslaw/
-  │           ├── start-meeting (design for MVP-1)
-  │           ├── round-robin dispatch: architect / engineer / verifier / etc.
-  │           ├── consensus check each round; retry until AGREE
-  │           └── return { minutesPaths, mvps, currentMvp, plan }
-  │
-  ├── Phase B (you):
-  │     ├── EnterPlanMode + ExitPlanMode  ← USER APPROVAL GATE
-  │     ├── Agent({ subagent_type: "open-coleslaw:worker", ... }) × N parallel
-  │     ├── Agent({ subagent_type: "open-coleslaw:verifier", ... })
-  │     └── if PASS: loop to next MVP; if FAIL: verify-retry meeting
-  │
-  └── Touch .cycle-complete when done
-```
-
-You dispatch subagents; you run Plan Mode; you verify. Orchestrator runs meetings.
+| "I'll role-play the architect myself to save time" | HARD-FORBIDDEN. Dispatch the actual specialist subagent. |
+| "Nested agents are expensive" | They are. That's fine. Transparency is the whole product. |
+| "Orchestrator subagent used to do this" | v0.6.0 removed that. You run the pipeline now. |
+| "Skip the kickoff for one-file change" | Always run kickoff. MVP list may have just one item. |
+| "User asked in Korean so I'll reply in English" | Match the user's language in every transcript and minute. |
 
 ## Dashboard
 
-Live at **http://localhost:35143** — shows the current meeting thread with speaker comments, MVP progress, and a comment box that queues browser input back into the meeting. Remind the user occasionally.
+Live at **http://localhost:35143** — shows the current meeting thread with each speaker's dispatched comment, MVP progress panel, and a comment box that queues browser input back into the meeting via `.pending-comments.jsonl`. Remind the user occasionally.
+
+## Agent roster (dispatched BY YOU)
+
+- `open-coleslaw:planner` — meeting chair, consensus master, MVP decomposer, minutes synthesizer. Always attends.
+- `open-coleslaw:architect` — system design, schema, API surface.
+- `open-coleslaw:engineer` — implementation feasibility, complexity, tech debt.
+- `open-coleslaw:verifier` — testing strategy at meeting time; test/build execution at verify time.
+- `open-coleslaw:product-manager` — requirements, user stories, acceptance criteria.
+- `open-coleslaw:researcher` — codebase exploration, prior art, library comparison.
+- `open-coleslaw:worker` — implementation after plan approval (parallel).

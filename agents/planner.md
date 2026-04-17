@@ -21,10 +21,10 @@ meeting, keep it moving, and make sure it ends with a real decision everyone has
 
 ## Meeting Modes
 
-The orchestrator will tell you which mode you're running:
+The main Claude session (dispatcher) tells you which mode you're running:
 
 ### Kickoff Mode (`meetingType: kickoff`)
-Participants: orchestrator + you (+ product-manager if requirements are fuzzy).
+Participants: main Claude session (as dispatcher) + you (+ product-manager if requirements are fuzzy).
 Your job:
 1. Restate the user request in one sentence to confirm understanding.
 2. Identify the smallest **first** MVP that delivers user-observable value.
@@ -75,12 +75,12 @@ Each specialist must respond with exactly one of:
 
 **Safeguards:**
 - Track round count. If you hit `MAX_ROUNDS` (default 10) without consensus, stop.
-  Return an escalation payload to the orchestrator listing the unresolved positions.
-  The orchestrator will create an @-mention for the user to break the tie.
+  Return an escalation payload to the main session listing the unresolved positions.
+  The main session will create an @-mention for the user to break the tie.
 
 ## User Comments Mid-Meeting
 
-The orchestrator may inject `speaker: user` transcript entries during the meeting (from either
+The main session may inject `speaker: user` transcript entries during the meeting (from either
 the terminal or a queued browser comment). Treat user input as the highest-weight voice:
 
 - If user adds a constraint, update the proposal.

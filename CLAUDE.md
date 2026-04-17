@@ -3,7 +3,7 @@
 Multi-agent orchestrator plugin for Claude Code.
 
 ## Architecture
-- 3-tier hierarchy: Orchestrator (proxy) -> Leaders (team leads) -> Workers (executors)
+- Flat dispatch: main Claude session (meeting runner) -> specialist subagents (per speaker turn) -> worker subagents (per implementation task). No nested orchestrator subagent; the main session IS the orchestrator.
 - MCP Server over stdio transport + Claude Code plugin (skills, hooks, agents)
 - SQLite storage at ~/.open-coleslaw/data.db
 - Web dashboard at http://localhost:35143
@@ -65,15 +65,15 @@ src/
 ## Agent Tiers
 | Tier | Model | Role |
 |------|-------|------|
-| Orchestrator (subagent) | inherits from user session | Meeting runner (only) |
-| Leader (specialists) | inherits from user session | Meeting participant |
-| Worker | inherits from user session | Implementation |
+| Meeting runner (main session) | whatever user picked in Claude Code | Dispatches specialists, runs MCP tools, calls EnterPlanMode, dispatches workers, verifies |
+| Specialist subagent | inherits from session | One per speaker turn: planner / architect / engineer / verifier / product-manager / researcher |
+| Worker subagent | inherits from session | One per parallel implementation task |
 
 **No model hard-coding anywhere.** All `agents/*.md` files use `model: inherit`.
 `TIER_CONFIGS` in `src/types/agent.ts` has `maxTurns` only — no `model` field.
 Switching `/model` in the user's Claude Code session changes the whole pipeline.
 
-Specialist leader roles: `planner`, `architect`, `engineer`, `verifier`, `product-manager`, `researcher`.
+Specialist roles: `planner`, `architect`, `engineer`, `verifier`, `product-manager`, `researcher`, plus `worker` for implementation.
 
 ## Departments & Allowed Tools
 - **Planning**: Read (planner always attends; facilitates, doesn't take positions)
@@ -93,12 +93,15 @@ Specialist leader roles: `planner`, `architect`, `engineer`, `verifier`, `produc
 - Node.js >= 18 required
 
 ## Key Decisions
-- **2-phase pipeline** — Phase A (orchestrator subagent) runs meetings only;
-  Phase B (main Claude session) runs Plan Mode + workers + verification.
-  Reason: `EnterPlanMode` does NOT work from a dispatched subagent.
-- **Orchestrator returns a structured `coleslaw-result` block** (minutesPaths,
-  mvps, currentMvp, plan{context, files, tasks, acceptance}) for the main
-  session to parse and act on.
+- **Flat dispatch (v0.6.0+)** — main Claude session runs the whole pipeline
+  directly. No `orchestrator` subagent. Every speaker turn is a real
+  `Agent({ subagent_type: "open-coleslaw:<role>" })` call followed by
+  `add-transcript` with the real response. Previously we had an orchestrator
+  subagent that role-played every specialist, which defeated the multi-agent
+  premise — fixed.
+- **Skill as runbook** — `skills/using-open-coleslaw/SKILL.md` is the full
+  pipeline instruction set that the main session follows. Loaded at session
+  start via the `session-start` hook.
 - **Model inheritance everywhere** — no hard-coded model names. Agent .md
   files use `model: inherit`; `TIER_CONFIGS` has no `model` field.
 - **Agents respond in the user's language** — detect from the original
@@ -108,11 +111,11 @@ Specialist leader roles: `planner`, `architect`, `engineer`, `verifier`, `produc
 - Meetings terminate on **consensus**, not round count (MAX_ROUNDS=10 escalates to @mention)
 - Planner always attends; facilitates and synthesizes, doesn't take technical positions
 - Dynamic attendee selection — not every specialist attends every meeting
-- Workers dispatched by the **main session** (not the orchestrator subagent),
+- Specialists and workers are always dispatched by the **main session**,
   destroyed after task completion.
 - Minutes saved to project's `docs/open-coleslaw/` with INDEX.md (per-project, survives compact/clear)
 - Dashboard renders a **meeting thread + comments UI**; browser comments flow through a file queue
 - Stop hook checks context usage at cycle end (`.cycle-complete` marker) and suggests `/compact` or `/clear` above ~30%
 - Self-extending: creates new capabilities on demand
 - Rule priority: rules.md > CLAUDE.md > conversation context
-- MVP cycle: kickoff -> (per MVP: design -> plan (main session) -> workers (main session) -> verify -> fail? verify-retry)
+- MVP cycle: kickoff -> (per MVP: design -> plan -> workers -> verify -> fail? verify-retry). The main session runs every step.
