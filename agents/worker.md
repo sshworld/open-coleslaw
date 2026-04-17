@@ -41,6 +41,9 @@ Before reporting completion, verify:
 - Do not refactor unrelated code unless explicitly asked
 - Do not add documentation files unless explicitly asked
 
+## Language
+Respond in the user's language (the dispatcher passes a language hint with the task). Your implementation report, notes, and rationale use the user's language. Code, comments in code, file paths, and commit messages stay in the project's natural language (follow project conventions — if the project uses English code comments, keep them English even when the user asked in Korean). If unsure, mirror what's already in the file.
+
 ## Reporting Format
 When done, report:
 ```

@@ -174,11 +174,61 @@ html, body {
   letter-spacing: 0.5px;
 }
 .past-meeting {
-  padding: 6px 10px;
+  padding: 8px 10px;
   font-size: 11px;
   color: var(--text2);
   border-left: 2px solid var(--border);
   margin-bottom: 4px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  border-radius: 0 4px 4px 0;
+}
+.past-meeting:hover {
+  background: rgba(0,240,255,0.04);
+  border-left-color: var(--cyan);
+  color: var(--text);
+}
+.past-meeting.viewing {
+  background: rgba(0,240,255,0.08);
+  border-left-color: var(--cyan);
+  color: var(--cyan);
+}
+.past-meeting .pm-title {
+  font-weight: 500;
+  display: block;
+  margin-bottom: 2px;
+}
+.past-meeting .pm-meta {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+/* viewing-past banner in the main area */
+#viewing-banner {
+  display: none;
+  padding: 8px 24px;
+  background: rgba(168,85,247,0.1);
+  border-bottom: 1px solid rgba(168,85,247,0.3);
+  font-size: 12px;
+  color: var(--purple);
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+}
+#viewing-banner.show { display: flex; }
+#viewing-banner button {
+  background: transparent;
+  border: 1px solid var(--purple);
+  color: var(--purple);
+  font-family: var(--font);
+  font-size: 11px;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+#viewing-banner button:hover {
+  background: var(--purple);
+  color: var(--bg);
 }
 
 /* Main thread area */
@@ -389,6 +439,10 @@ html, body {
   </aside>
 
   <main id="main">
+    <div id="viewing-banner">
+      <span id="viewing-banner-text">Viewing a past meeting</span>
+      <button type="button" onclick="backToLive()">← Back to live meeting</button>
+    </div>
     <div id="meeting-header">
       <div id="meeting-title">No meeting in progress</div>
       <div id="meeting-meta">Waiting for orchestrator…</div>
@@ -413,10 +467,17 @@ html, body {
 // State
 // -----------------------------------------------------------------
 const state = {
-  sessions: new Map(),     // sessionId → SessionSnapshot
+  sessions: new Map(),     // sessionId (== projectPath) → SessionSnapshot
   activeSessionId: null,
+  viewedMeetingId: null,   // null → show live meeting; else show that past meeting
   ws: null,
 };
+
+function backToLive() {
+  state.viewedMeetingId = null;
+  renderAll();
+}
+window.backToLive = backToLive;
 
 const AVATARS = {
   planner:           '📌',
@@ -578,7 +639,7 @@ function renderTabs() {
     if (sid === state.activeSessionId) btn.classList.add('active');
     if (!s.isActive) btn.classList.add('inactive');
     btn.textContent = s.displayName + (s.currentMeeting ? ' •' : '');
-    btn.onclick = () => { state.activeSessionId = sid; renderAll(); };
+    btn.onclick = () => { state.activeSessionId = sid; state.viewedMeetingId = null; renderAll(); };
     bar.appendChild(btn);
   }
 }
@@ -611,7 +672,17 @@ function renderSidebar() {
     for (const m of s.pastMeetings) {
       const row = document.createElement('div');
       row.className = 'past-meeting';
-      row.textContent = m.topic + ' — ' + (m.decisions?.length || 0) + ' decisions';
+      if (state.viewedMeetingId === m.meetingId) row.classList.add('viewing');
+      const title = document.createElement('span');
+      title.className = 'pm-title';
+      title.textContent = m.topic;
+      const meta = document.createElement('span');
+      meta.className = 'pm-meta';
+      meta.textContent =
+        m.meetingType.toUpperCase() + ' · ' + (m.decisions?.length || 0) + ' decisions';
+      row.appendChild(title);
+      row.appendChild(meta);
+      row.onclick = () => { state.viewedMeetingId = m.meetingId; renderAll(); };
       pastEl.appendChild(row);
     }
   }
@@ -625,8 +696,24 @@ function renderMain() {
   const thread = document.getElementById('thread');
   const input = document.getElementById('comment-input');
   const send  = document.getElementById('comment-send');
+  const banner = document.getElementById('viewing-banner');
+  const bannerText = document.getElementById('viewing-banner-text');
 
-  if (!s || !s.currentMeeting) {
+  // Resolve which meeting to render: viewedMeetingId (past) or current
+  let m = null;
+  let isPast = false;
+  if (s) {
+    if (state.viewedMeetingId) {
+      m = (s.pastMeetings || []).find((x) => x.meetingId === state.viewedMeetingId) || null;
+      isPast = !!m;
+      // If the past meeting disappeared (retention eviction), fall back to live.
+      if (!m) state.viewedMeetingId = null;
+    }
+    if (!m) m = s.currentMeeting;
+  }
+
+  if (!m) {
+    banner.classList.remove('show');
     title.textContent = 'No meeting in progress';
     meta.textContent  = s ? 'Session ready' : 'No active session';
     agenda.innerHTML  = '';
@@ -636,9 +723,15 @@ function renderMain() {
     return;
   }
 
-  const m = s.currentMeeting;
+  if (isPast) {
+    banner.classList.add('show');
+    bannerText.textContent = '📖 Viewing past meeting · ' + m.topic;
+  } else {
+    banner.classList.remove('show');
+  }
+
   title.textContent = m.topic;
-  meta.textContent = [m.meetingType.toUpperCase(), m.status, m.participants.join(', ')].join(' · ');
+  meta.textContent = [m.meetingType.toUpperCase(), m.status, (m.participants || []).join(', ')].join(' · ');
   agenda.innerHTML = '';
   (m.agenda || []).forEach((item, i) => {
     const chip = document.createElement('span');
@@ -656,8 +749,13 @@ function renderMain() {
   }
   thread.scrollTop = thread.scrollHeight;
 
-  input.disabled = (m.status === 'completed');
-  send.disabled  = (m.status === 'completed');
+  // Comment box: disabled when viewing a past meeting or when current meeting is completed
+  const disabled = isPast || m.status === 'completed';
+  input.disabled = disabled;
+  send.disabled  = disabled;
+  input.placeholder = isPast
+    ? 'Comments disabled — this is a past meeting'
+    : 'Add a comment to this meeting… (Enter to send, Shift+Enter for newline)';
 }
 
 function commentEl(c) {

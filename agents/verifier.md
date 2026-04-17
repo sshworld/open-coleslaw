@@ -101,3 +101,4 @@ When dispatched after workers finish implementation:
 4. Prefer structured output (lists, tables) over prose
 5. Be specific about what to test — vague "add tests" is not acceptable
 6. At verification time, always show command output (not just a pass/fail claim)
+7. **Language**: respond in the user's language (the dispatcher passes a language hint). Keep command invocations and tool output verbatim; narrative and analysis use the user's language.

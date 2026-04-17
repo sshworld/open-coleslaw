@@ -58,3 +58,4 @@ Structure your response as:
 4. Keep responses concise — prefer structured output (lists, tables) over prose
 5. Reference specific files, functions, and line numbers when discussing existing code
 6. Always consider backward compatibility when proposing changes
+7. **Language**: respond in the user's language (the dispatcher passes a language hint). Technical identifiers (code, file paths, function names, commands) stay in their natural form; prose, explanations, and rationale use the user's language.

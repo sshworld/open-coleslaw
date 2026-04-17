@@ -180,7 +180,7 @@ describe('StateBridge', () => {
     expect(snap.sessions).toHaveLength(0);
   });
 
-  it('registerSession adds a session', () => {
+  it('registerSession adds a session keyed by projectPath', () => {
     const displayName = bridge.registerSession({
       sessionId: 's1',
       projectPath: '/tmp/x',
@@ -190,8 +190,23 @@ describe('StateBridge', () => {
 
     const snap = bridge.getSnapshot();
     expect(snap.sessions).toHaveLength(1);
-    expect(snap.sessions[0].sessionId).toBe('s1');
+    // Wire-side sessionId is the projectPath (stable across terminal reopens).
+    expect(snap.sessions[0].sessionId).toBe('/tmp/x');
+    expect(snap.sessions[0].projectPath).toBe('/tmp/x');
     expect(snap.sessions[0].currentMeeting).toBeNull();
+  });
+
+  it('re-registering the same projectPath does NOT create a duplicate "(1)" entry', () => {
+    bridge.registerSession({ sessionId: 's1', projectPath: '/tmp/x', projectName: 'x' });
+    const second = bridge.registerSession({
+      sessionId: 's2',
+      projectPath: '/tmp/x',
+      projectName: 'x',
+    });
+    expect(second).toBe('x'); // no "(1)" suffix
+
+    const snap = bridge.getSnapshot();
+    expect(snap.sessions).toHaveLength(1);
   });
 
   it('meeting_started event installs a current meeting', () => {

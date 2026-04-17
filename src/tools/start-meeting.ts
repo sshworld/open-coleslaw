@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { Orchestrator } from '../orchestrator/orchestrator.js';
 import type { Department } from '../types/index.js';
+import type { MeetingType } from '../types/dashboard-events.js';
+import { eventBus } from '../orchestrator/event-bus.js';
 
 export const startMeetingSchema = {
   topic: z.string().describe('Meeting topic'),
@@ -37,6 +39,16 @@ export async function startMeetingHandler({
       agenda,
       departments: departments as Department[] | undefined,
       meetingType,
+    });
+
+    // Notify the dashboard so the meeting thread UI can render.
+    eventBus.emitAgentEvent({
+      kind: 'meeting_started',
+      meetingId: result.meetingId,
+      meetingType: result.meetingType as MeetingType,
+      topic: result.topic,
+      agenda: [...result.agenda],
+      participants: [...result.departments],
     });
 
     return {
