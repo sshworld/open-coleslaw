@@ -100,17 +100,28 @@ After the meeting:
 - [ ] `docs/open-coleslaw/YYYY-MM-DD_001_<slug>.md` (design) exists
 - [ ] Files are readable as git-diffable markdown (no weird encoding)
 
-## 9. Cycle complete + Stop hook
+## 9. Auto-loop across all MVPs (v0.6.2 regression guard)
 
-After all MVPs are done:
+Use a prompt that decomposes into 2+ MVPs (e.g., a meaningful app, not a one-liner fix):
 
-- [ ] Marker file `docs/open-coleslaw/.cycle-complete` is touched
+- [ ] After MVP-1's verifier reports PASS, the main session **automatically** starts MVP-2's design meeting
+- [ ] The main session does **NOT** ask "MVP-2 진행할까요?" / "계속할까요?" / any variant between MVPs
+- [ ] `docs/open-coleslaw/.cycle-complete` is **NOT** present after MVP-1 completes
+- [ ] `.cycle-complete` is touched ONLY after the final MVP's verifier reports PASS
+- [ ] Between-MVP user checkpoints happen ONLY at each MVP's Plan Mode approval gate
+- [ ] User CAN interrupt at any point (Ctrl+C or a new prompt) and the pipeline stops
+
+## 10. Cycle complete + Stop hook
+
+After ALL MVPs are done:
+
+- [ ] Marker file `docs/open-coleslaw/.cycle-complete` exists
 - [ ] Stop hook reads transcript usage; if ≥30%, emits `systemMessage`
       suggesting `/compact` or `/clear`
 - [ ] The marker is deleted after the hook fires (so the next regular turn
       does not get nagged)
 
-## 10. User comments mid-meeting
+## 11. User comments mid-meeting
 
 ### Terminal channel:
 

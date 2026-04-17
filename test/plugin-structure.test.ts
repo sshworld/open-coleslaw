@@ -99,6 +99,24 @@ describe('plugin structure — skills', () => {
     const md = readFileSync(join(SKILLS, 'meeting', 'SKILL.md'), 'utf-8');
     expect(md).not.toMatch(/subagent_type:\s*"open-coleslaw:orchestrator"/);
   });
+
+  it('using-open-coleslaw skill enforces the auto-loop contract (v0.6.2)', () => {
+    const md = readFileSync(join(SKILLS, 'using-open-coleslaw', 'SKILL.md'), 'utf-8');
+    // Must tell the runner to auto-loop without asking
+    expect(md).toMatch(/Auto-loop/i);
+    // Must forbid asking the user for next-MVP permission
+    expect(md.toLowerCase()).toMatch(/do not ask/);
+    // Must restrict .cycle-complete to the final MVP
+    expect(md.toLowerCase()).toMatch(/only after the (final|last) mvp/);
+    // Must NOT contain the old loose phrasing that let the model stop between MVPs
+    expect(md).not.toMatch(/loop back to Phase 2 with the next MVP\./); // plain version without auto-loop guard
+  });
+
+  it('meeting skill propagates the auto-loop instruction', () => {
+    const md = readFileSync(join(SKILLS, 'meeting', 'SKILL.md'), 'utf-8');
+    expect(md.toLowerCase()).toMatch(/auto-loop|do not prompt|without asking/);
+    expect(md.toLowerCase()).toMatch(/only after the (last|final) mvp/);
+  });
 });
 
 describe('plugin structure — version alignment', () => {

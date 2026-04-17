@@ -122,8 +122,18 @@ Agent({
 })
 ```
 
-- **PASS**: mark MVP done in INDEX.md checklist. If more MVPs remain, loop back to Phase 2 with the next MVP. If none remain, touch `<cwd>/docs/open-coleslaw/.cycle-complete` (the Stop hook picks this up) and report to the user.
-- **FAIL**: `start-meeting({ meetingType: "verify-retry", topic: "<failure summary>" })`, dispatch planner + engineer + verifier for a focused fix discussion, reach consensus, return to Phase 3 with the revised plan.
+- **PASS (not the last MVP)**: mark MVP done in INDEX.md checklist. **Auto-loop immediately back to Phase 2 with the next pending MVP. Do NOT ask the user "계속 진행할까요?" / "MVP-N 진행" / or any variant.** The user already approved the overall plan at kickoff; their next checkpoint is the NEXT MVP's Plan Mode. Do NOT touch `.cycle-complete` between MVPs — only after the final MVP.
+- **PASS (last MVP)**: mark MVP done. ONLY NOW, touch `<cwd>/docs/open-coleslaw/.cycle-complete` so the Stop hook can check context usage. Then give a final report and wait for the user.
+- **FAIL**: `start-meeting({ meetingType: "verify-retry", topic: "<failure summary>" })`, dispatch planner + engineer + verifier for a focused fix discussion, reach consensus, return to Phase 3 with the revised plan. Do NOT touch `.cycle-complete` on failures.
+
+### Auto-loop contract (strict)
+
+You MUST auto-loop through every MVP in the kickoff list until:
+1. All MVPs are done (→ touch `.cycle-complete`, final report), OR
+2. A FAIL leads to a verify-retry meeting that itself escalates to the user via `@mention`, OR
+3. The user explicitly interrupts (new prompt, Ctrl+C, or a message saying "stop" / "pause" / "그만" / equivalent).
+
+Any other stop — especially "asking permission to continue to the next MVP" — is a regression. You run the whole pipeline end-to-end in a single session.
 
 ## User Comments Mid-Meeting
 
@@ -142,6 +152,8 @@ User turns are the highest-weight voice — update proposals immediately.
 | "I'll role-play the architect myself to save time" | HARD-FORBIDDEN. Dispatch the actual specialist subagent. |
 | "Nested agents are expensive" | They are. That's fine. Transparency is the whole product. |
 | "Orchestrator subagent used to do this" | v0.6.0 removed that. You run the pipeline now. |
+| "Let me ask the user if they want to continue with MVP-2" | FORBIDDEN. Auto-loop until all MVPs done (v0.6.2). Only the user interrupting stops the pipeline mid-way. |
+| "I'll touch .cycle-complete because this MVP is done" | Only touch it after the LAST MVP. Between-MVP touches trigger the Stop hook prematurely. |
 | "Skip the kickoff for one-file change" | Always run kickoff. MVP list may have just one item. |
 | "User asked in Korean so I'll reply in English" | Match the user's language in every transcript and minute. |
 

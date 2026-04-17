@@ -18,7 +18,7 @@ One speaker turn = one `Agent` call with the specialist's `subagent_type`, follo
 5. `generate-minutes` → save to `<cwd>/docs/open-coleslaw/YYYY-MM-DD_<seq>_<slug>.md`.
 6. `EnterPlanMode` → write plan from the minutes → `ExitPlanMode` for user approval.
 7. On approval: `Agent({ subagent_type: "open-coleslaw:worker", ... })` in parallel per task.
-8. `Agent({ subagent_type: "open-coleslaw:verifier", ... })` for tests/build. PASS → next MVP or `.cycle-complete`. FAIL → `chain-meeting` with `meetingType: "verify-retry"` and re-plan.
+8. `Agent({ subagent_type: "open-coleslaw:verifier", ... })` for tests/build. PASS → auto-loop to next MVP WITHOUT asking the user (do NOT prompt "진행할까요?"). Touch `.cycle-complete` only after the LAST MVP. FAIL → `chain-meeting` with `meetingType: "verify-retry"` and re-plan.
 
 ## Language
 
