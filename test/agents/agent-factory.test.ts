@@ -3,13 +3,13 @@ import { createAgentConfig, getOrchestratorSystemPrompt } from '../../src/agents
 
 describe('createAgentConfig', () => {
   describe('orchestrator tier', () => {
-    it('returns config with correct model and orchestrator system prompt reference', () => {
+    it('returns config with orchestrator turn budget (model inherited)', () => {
       const config = createAgentConfig({
         tier: 'orchestrator',
         role: 'orchestrator',
         department: 'architecture',
       });
-      expect(config.model).toBe('claude-opus-4-6');
+      expect(config.model).toBeUndefined();
       expect(config.maxTurns).toBe(10);
     });
 
@@ -26,13 +26,13 @@ describe('createAgentConfig', () => {
   });
 
   describe('leader tier', () => {
-    it('returns config with leader-tier settings and department tools', () => {
+    it('returns leader-tier turn budget and department tools', () => {
       const config = createAgentConfig({
         tier: 'leader',
         role: 'engineer',
         department: 'engineering',
       });
-      expect(config.model).toBe('claude-sonnet-4-6');
+      expect(config.model).toBeUndefined();
       expect(config.maxTurns).toBe(20);
 
       expect(config.allowedTools).toContain('Write');
@@ -42,14 +42,14 @@ describe('createAgentConfig', () => {
   });
 
   describe('worker tier', () => {
-    it('returns config with worker-tier settings', () => {
+    it('returns worker-tier turn budget', () => {
       const config = createAgentConfig({
         tier: 'worker',
         role: 'feature-dev',
         department: 'engineering',
         task: 'Implement the login form',
       });
-      expect(config.model).toBe('claude-sonnet-4-6');
+      expect(config.model).toBeUndefined();
       expect(config.maxTurns).toBe(30);
 
       expect(config.allowedTools).toContain('Write');
@@ -64,39 +64,15 @@ describe('createAgentConfig', () => {
         }),
       ).toThrow('Worker agents require a task description');
     });
-  });
 
-  describe('research worker override', () => {
-    it('uses claude-haiku-4-5 model and $0.10 budget for research workers', () => {
+    it('does not special-case research workers (model still inherits)', () => {
       const config = createAgentConfig({
         tier: 'worker',
         role: 'code-explorer',
         department: 'research',
         task: 'Explore the authentication module',
       });
-      expect(config.model).toBe('claude-haiku-4-5');
-
-    });
-
-    it('does not override non-research workers', () => {
-      const config = createAgentConfig({
-        tier: 'worker',
-        role: 'feature-dev',
-        department: 'engineering',
-        task: 'Implement feature X',
-      });
-      expect(config.model).toBe('claude-sonnet-4-6');
-
-    });
-
-    it('does not override research leaders', () => {
-      const config = createAgentConfig({
-        tier: 'leader',
-        role: 'researcher',
-        department: 'research',
-      });
-      expect(config.model).toBe('claude-sonnet-4-6');
-
+      expect(config.model).toBeUndefined();
     });
   });
 });

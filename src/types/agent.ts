@@ -60,23 +60,30 @@ export interface AgentNode {
 }
 
 export interface AgentConfig {
-  model: string;
+  /**
+   * Optional. Empty string or missing means "inherit from the calling session".
+   * In the current architecture (agents dispatched via Claude Code Agent tool)
+   * models are inherited from the user's session — not hard-coded.
+   */
+  model?: string;
   maxTurns: number;
 
   allowedTools: string[];
 }
 
+/**
+ * Per-tier runtime caps. Model is intentionally omitted — every agent inherits
+ * the model from the user's Claude Code session (see agents/*.md frontmatter
+ * `model: inherit`). Only turn-budget remains.
+ */
 export const TIER_CONFIGS: Record<AgentTier, Omit<AgentConfig, 'allowedTools'>> = {
   orchestrator: {
-    model: 'claude-opus-4-6',
     maxTurns: 10,
   },
   leader: {
-    model: 'claude-sonnet-4-6',
     maxTurns: 20,
   },
   worker: {
-    model: 'claude-sonnet-4-6',
     maxTurns: 30,
   },
 };

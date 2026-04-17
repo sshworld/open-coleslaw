@@ -30,21 +30,21 @@ describe('isValidParent', () => {
 });
 
 describe('getTierConfig', () => {
-  it('returns orchestrator config with correct model and maxTurns', () => {
+  it('returns orchestrator config with maxTurns (model inherited)', () => {
     const config = getTierConfig('orchestrator');
-    expect(config.model).toBe('claude-opus-4-6');
+    expect(config.model).toBeUndefined();
     expect(config.maxTurns).toBe(10);
   });
 
   it('returns leader config', () => {
     const config = getTierConfig('leader');
-    expect(config.model).toBe('claude-sonnet-4-6');
+    expect(config.model).toBeUndefined();
     expect(config.maxTurns).toBe(20);
   });
 
   it('returns worker config', () => {
     const config = getTierConfig('worker');
-    expect(config.model).toBe('claude-sonnet-4-6');
+    expect(config.model).toBeUndefined();
     expect(config.maxTurns).toBe(30);
   });
 

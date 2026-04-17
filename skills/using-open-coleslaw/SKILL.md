@@ -1,110 +1,128 @@
 ---
 name: using-open-coleslaw
-description: "Loaded automatically at session start. Establishes that ALL software tasks must go through the open-coleslaw orchestrator pipeline: kickoff → per-MVP design meeting → PRD minutes → plan review → user approval → implement → verify. Never skip this."
+description: "Loaded automatically at session start. Establishes the 2-phase open-coleslaw pipeline: Phase A dispatches the orchestrator subagent to run meetings (kickoff + per-MVP design). Phase B is run by the main Claude session — reads the orchestrator's structured result, enters Plan Mode, gets user approval, dispatches workers, verifies."
 ---
 
 # You have Open Coleslaw.
 
-Like coleslaw — it's already prepared. The user just types what they want. You handle the rest through the orchestrator.
+Like coleslaw — it's already prepared. The user just types what they want. You handle the rest through a **2-phase pipeline** below.
 
 <HARD-GATE>
-Do NOT write code, create files, run commands, or take ANY implementation action without first going through the open-coleslaw pipeline. This applies to EVERY request regardless of perceived simplicity.
+Do NOT write code, create files, run commands, or take ANY implementation action without first going through the pipeline. This applies to EVERY request regardless of perceived simplicity.
+
+Language: **respond and run meetings in the same language the user used** (ask in Korean → minutes in Korean).
 </HARD-GATE>
 
-## The Rule
+## Why 2 Phases?
 
-**Every software request → dispatch the orchestrator agent → kickoff meeting → per-MVP cycles → user approval → then implement.**
+`EnterPlanMode` / `ExitPlanMode` do NOT work from inside a dispatched subagent — only the **main** Claude session can enter Plan Mode. So we split:
 
-No exceptions. Not for "simple" tasks. Not for "quick fixes." Not for anything.
+- **Phase A (subagent)**: orchestrator runs the meetings. Produces minutes on disk + a structured result.
+- **Phase B (main session, YOU)**: receive the structured result, call `EnterPlanMode`, get user approval, dispatch workers, verify.
 
-## How It Works
+## Phase A — Dispatch the Orchestrator
 
-When the user asks you to build, create, fix, design, or modify anything:
-
-1. **Dispatch the orchestrator agent** using the Agent tool:
+1. Dispatch `open-coleslaw:orchestrator` via the Agent tool:
    ```
    Agent({
      subagent_type: "open-coleslaw:orchestrator",
-     prompt: "[user's full request + any project context]"
+     prompt: `<user's full request>
+
+     Project context:
+     - cwd: ${cwd}
+     - tech stack / git state / anything obvious
+     - Language: ${detected-language-of-user-request, e.g., Korean}
+
+     Run the full meeting pipeline:
+     1. Kickoff meeting → decompose into MVPs
+     2. Design meeting for MVP-1 → reach consensus → minutes
+     (Stop after MVP-1's design meeting. Do NOT write code. Do NOT call EnterPlanMode.)
+
+     Return a STRUCTURED result:
+     - minutesPaths: absolute paths to all minutes written under docs/open-coleslaw/
+     - mvps: [{title, goal, scope}]  — ordered list from the kickoff
+     - currentMvp: { title, goal }    — the MVP-1 we just designed
+     - plan: {
+         context: short summary of the design decisions,
+         files: list of files to create/modify,
+         tasks: ordered list of concrete implementation tasks for workers,
+         acceptance: verification criteria from the verifier,
+       }
+     `
    })
    ```
 
-2. **The orchestrator runs a kickoff meeting** with the planner to split the request into ordered MVPs.
+2. The orchestrator runs meetings (round-robin, consensus-based), writes minutes to `docs/open-coleslaw/`, and returns the structured result.
 
-3. **For each MVP**, the orchestrator runs a design meeting. The planner calls specialists in round-robin (architect / engineer / verifier / product-manager / researcher — dynamically selected). The meeting does NOT end after a fixed number of rounds — it ends only when every participant agrees (or MAX_ROUNDS=10 forces an escalation via @mention).
+## Phase B — You Continue the Pipeline
 
-4. **MCP tools the orchestrator uses**:
-   - `start-meeting` with `meetingType: kickoff | design | verify-retry`
-   - `add-transcript` per speaker turn
-   - `generate-minutes` at end of meeting
-   - `execute-tasks` to pull the structured task list
-   - `chain-meeting` on verification failure
+3. Parse the orchestrator's return value. Confirm minutes file exists.
 
-5. **After the design meeting, the orchestrator enters Plan Mode:**
-   - Saves minutes to `docs/open-coleslaw/` in the project
-   - Uses EnterPlanMode to write the implementation plan
-   - Uses ExitPlanMode to present for your approval
+4. **Enter Plan Mode** with a plan built from `plan.context`, `plan.files`, `plan.tasks`, `plan.acceptance`:
+   - `EnterPlanMode`
+   - Write a concise plan file (Context / Files / Tasks / Verification sections)
+   - `ExitPlanMode` → user sees it and approves/rejects
 
-6. **You review the plan in Plan Mode UI:**
-   - Approve → orchestrator dispatches `open-coleslaw:worker` agents
-   - Request changes → orchestrator adjusts or chains a follow-up meeting
-   - Reject → drop the plan
+5. **On rejection**: re-dispatch orchestrator with `chain-meeting` semantics (pass previous meetingId + user feedback) to re-run the MVP-1 design meeting.
 
-7. **After workers finish, the verifier runs tests/build.** Pass → next MVP. Fail → the orchestrator opens a `verify-retry` meeting focused on the failure, re-plans, re-implements.
+6. **On approval**: dispatch `open-coleslaw:worker` agents in parallel (one per task from `plan.tasks`):
+   ```
+   Agent({ subagent_type: "open-coleslaw:worker", prompt: "<specific task>" })
+   ```
+   Wait for all to finish. Aggregate results.
 
-8. **When every MVP is done**, the orchestrator touches `docs/open-coleslaw/.cycle-complete`. The Stop hook then checks your context usage and may suggest `/compact` or `/clear` before the next task. Minutes on disk mean you lose nothing.
+7. **Verify**: dispatch `open-coleslaw:verifier`:
+   ```
+   Agent({ subagent_type: "open-coleslaw:verifier", prompt: `
+     Acceptance criteria: ${plan.acceptance}
+     Worker results: ${aggregated}
+     Run tests / build. Report PASS or FAIL.
+   `})
+   ```
+
+8. **PASS** → move to next MVP: dispatch orchestrator again for MVP-2's design meeting (skip kickoff; orchestrator reads existing `docs/open-coleslaw/` to know the MVP list). Repeat Phase B.
+
+   **FAIL** → dispatch orchestrator with `meetingType: verify-retry` for a focused fix meeting. Then re-plan (Phase B step 4), re-implement.
+
+9. **All MVPs done** → touch `docs/open-coleslaw/.cycle-complete` marker (this lets the Stop hook check context usage). Final summary to user.
 
 ## Red Flags — STOP
-
-These thoughts mean you are about to skip the pipeline:
 
 | Thought | Reality |
 |---------|---------|
 | "This is just a small change" | Small changes compound. Use the pipeline. |
-| "I can just do this directly" | The user installed this plugin FOR the pipeline. |
-| "Let me quickly fix this" | Quick fixes become tech debt. Meeting first. |
-| "It's obvious what to do" | If it's obvious, the meeting will be fast. Do it anyway. |
-| "The user seems in a hurry" | Fast meetings are still meetings. Don't skip. |
-| "I already know the answer" | The team might disagree. Get their input. |
-| "Let's just pick 3 rounds and be done" | Rounds are capped at 10, but they end on **consensus**, not a timer. |
+| "Let me quickly fix this" | Meeting first. |
+| "I know what to write" | Specialists might disagree. Meet. |
+| "Skip the kickoff for one-file change" | Always run kickoff. MVP list may just be `[one item]`. |
+| "Orchestrator said do X, let me just do X" | No — enter Plan Mode first, get user approval. |
+| "User asked in English/Korean so write minutes in English" | **Write minutes in the user's language.** |
 
-## Agent Dispatch Pattern
-
-All work flows through the Agent tool. The hierarchy:
+## Agent Dispatch Summary
 
 ```
-You (Claude Code)
-  └── Agent: open-coleslaw:orchestrator
-        │
-        ├── Kickoff Phase:
-        │   └── Agent: open-coleslaw:planner (+ product-manager if fuzzy)
-        │
-        ├── For each MVP:
-        │   │
-        │   ├── Design Meeting Phase (round-robin, consensus-based):
-        │   │   ├── Agent: open-coleslaw:planner      ← always chairs
-        │   │   ├── Agent: open-coleslaw:architect    ← dynamic
-        │   │   ├── Agent: open-coleslaw:engineer     ← dynamic
-        │   │   ├── Agent: open-coleslaw:verifier     ← dynamic
-        │   │   ├── Agent: open-coleslaw:product-manager  ← conditional
-        │   │   └── Agent: open-coleslaw:researcher   ← conditional
-        │   │
-        │   ├── Plan Mode → User approves
-        │   │
-        │   ├── Implementation Phase:
-        │   │   ├── Agent: open-coleslaw:worker (task 1)
-        │   │   ├── Agent: open-coleslaw:worker (task 2)
-        │   │   └── Agent: open-coleslaw:worker (task N)
-        │   │
-        │   └── Verify Phase:
-        │       └── Agent: open-coleslaw:verifier → PASS / FAIL
-        │             FAIL → verify-retry meeting → workers again
-        │
-        └── Touch .cycle-complete marker when all MVPs done
+You (main Claude session)
+  │
+  ├── Phase A: Agent({ subagent_type: "open-coleslaw:orchestrator", ... })
+  │     └── inside subagent:
+  │           ├── start-meeting (kickoff)
+  │           ├── dispatch open-coleslaw:planner
+  │           ├── generate-minutes → save to docs/open-coleslaw/
+  │           ├── start-meeting (design for MVP-1)
+  │           ├── round-robin dispatch: architect / engineer / verifier / etc.
+  │           ├── consensus check each round; retry until AGREE
+  │           └── return { minutesPaths, mvps, currentMvp, plan }
+  │
+  ├── Phase B (you):
+  │     ├── EnterPlanMode + ExitPlanMode  ← USER APPROVAL GATE
+  │     ├── Agent({ subagent_type: "open-coleslaw:worker", ... }) × N parallel
+  │     ├── Agent({ subagent_type: "open-coleslaw:verifier", ... })
+  │     └── if PASS: loop to next MVP; if FAIL: verify-retry meeting
+  │
+  └── Touch .cycle-complete when done
 ```
 
-You only dispatch the orchestrator. It manages the full pipeline.
+You dispatch subagents; you run Plan Mode; you verify. Orchestrator runs meetings.
 
 ## Dashboard
 
-The real-time dashboard runs at **http://localhost:35143** — it now shows the current meeting as a thread with speaker comments, an MVP progress panel, and a comment box that queues browser-side user input into the meeting. Remind the user occasionally.
+Live at **http://localhost:35143** — shows the current meeting thread with speaker comments, MVP progress, and a comment box that queues browser input back into the meeting. Remind the user occasionally.

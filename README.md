@@ -13,20 +13,26 @@ You type a prompt like *"Build me a balance game app"*. That's it.
 ```
 You: "Build me a balance game app"
 
-  → Orchestrator dispatched (Agent tool)
-  → Kickoff meeting: planner breaks it into ordered MVPs
-  → For each MVP:
-      → Design meeting: round-robin, consensus-based termination
-      → PRD meeting minutes saved to docs/open-coleslaw/
-      → Plan Mode activated — you review the implementation plan
-      → You approve
-      → Workers write the code in parallel
-      → Verifier runs tests/build
-      → Pass → next MVP ·  Fail → verify-retry meeting
-  → All MVPs done → final report
+  Phase A  (orchestrator subagent)
+    → Kickoff meeting: planner breaks request into ordered MVPs
+    → Design meeting for MVP-1: round-robin, consensus-based termination
+    → PRD minutes saved to docs/open-coleslaw/
+    → Returns { minutesPaths, mvps, plan }
+
+  Phase B  (main Claude session)
+    → Enters Plan Mode with the meeting's plan
+    → You approve (or request changes → verify-retry meeting)
+    → Workers write the code in parallel
+    → Verifier runs tests / build
+    → Pass → next MVP ·  Fail → verify-retry meeting
+    → All MVPs done → final report
 ```
 
-You never call a tool. You never pick a department. You never manage an agent. The orchestrator handles everything — including entering **Plan Mode** so you can review the implementation plan in the native UI before any code is written.
+Why 2 phases? `EnterPlanMode` only works in the main Claude session (not in
+dispatched subagents). So the orchestrator handles meetings, the main session
+handles Plan Mode + worker dispatch + verification.
+
+You never call a tool. You never pick a department. You never manage an agent.
 
 Meeting minutes are saved to `docs/open-coleslaw/` in your project, so they persist even if you `/compact` or `/clear` your Claude Code context between MVPs.
 
@@ -51,20 +57,24 @@ Design a REST API for a todo app
 
 You should see the orchestrator agent being dispatched and a kickoff meeting starting automatically.
 
-## The Pipeline
+## The Pipeline (2-phase)
 
-Every request follows this flow.
-
+**Phase A — the orchestrator subagent runs meetings:**
 ```
-Prompt
-  → Orchestrator
-  → Kickoff meeting (planner breaks request into MVPs)
-  → for each MVP:
-       Design meeting → consensus → Minutes → Plan Mode → Approve → Workers → Verify
-  → Final report
+Kickoff meeting (planner breaks request into MVPs)
+for each MVP:
+   Design meeting → consensus → Minutes
+```
+The orchestrator returns a structured `{ minutesPaths, mvps, plan }` result.
+
+**Phase B — the main Claude session acts on the result:**
+```
+EnterPlanMode → user approval → Workers (parallel) → Verifier → next MVP or retry
 ```
 
-Verification failure on an MVP doesn't abort the cycle — it opens a focused `verify-retry` meeting and re-plans the fix.
+Verification failure on an MVP doesn't abort the cycle — the main session
+dispatches the orchestrator again for a focused `verify-retry` meeting and
+re-plans the fix.
 
 When the whole cycle ends the orchestrator touches a marker file, and the `Stop` hook checks your context usage. If you're over ~30%, it suggests running `/compact` or `/clear` before the next task. Minutes on disk mean you lose nothing.
 
@@ -175,10 +185,14 @@ Ask for a workflow that doesn't exist yet, and the orchestrator creates it — n
 
 | Tier | Model | Role |
 |------|-------|------|
-| Orchestrator | claude-opus (1M context) | Full-picture routing, delegation, judgment |
-| Leader (specialists) | claude-sonnet | Meetings, technical decisions |
-| Worker | claude-sonnet | Code, implementation |
-| Research Worker | claude-haiku | Quick lookups, exploration |
+| Orchestrator (subagent) | inherits from user session | Meeting runner |
+| Leader (specialists) | inherits from user session | Meeting participant |
+| Worker | inherits from user session | Implementation |
+
+**No model is hard-coded.** Every agent — orchestrator, specialists, workers —
+runs on whatever model you've selected in your Claude Code session (Opus,
+Sonnet, Haiku, or anything Anthropic ships next). Switch models with `/model`
+and the whole pipeline follows.
 
 ## Philosophy
 

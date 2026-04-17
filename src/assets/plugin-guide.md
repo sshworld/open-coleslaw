@@ -1,11 +1,13 @@
 # Open-Coleslaw Plugin Guide
 
 ## Overview
-Multi-agent orchestrator for Claude Code. Hierarchical agent system:
-Orchestrator (proxy) → Part Leaders (team leads) → Workers (executors)
+Multi-agent orchestrator for Claude Code. 2-phase pipeline:
+- Phase A: orchestrator subagent runs meetings (kickoff + per-MVP design).
+- Phase B: main Claude session runs Plan Mode + worker dispatch + verification.
 
 ## Available Skills
-- `/meeting [topic]` — Start a meeting (auto-selects leaders if topic given)
+- `/meeting [topic]` — Start the open-coleslaw pipeline
+- `/using-open-coleslaw` — Trigger the full pipeline on any request
 - `/status` — Show current meetings, agents, and pending mentions
 - `/dashboard` — Open web dashboard at http://localhost:35143
 - `/mention` — View and respond to pending @mentions
@@ -13,29 +15,28 @@ Orchestrator (proxy) → Part Leaders (team leads) → Workers (executors)
 - `/minutes [meetingId]` — View meeting minutes
 
 ## Available Hooks
-- `pre-read` — Loads rules + plugin guide + CLAUDE.md/README before execution
-- `auto-route` — Analyzes user prompts and auto-routes to appropriate skill/agent
-- `auto-commit` — Creates conventional commits after task completion
-- `doc-update` — Updates CLAUDE.md/README.md after process completion
-- `flow-verify` — Verifies PRD user flows after development
-- `mvp-cycle` — Triggers re-meeting on verification failure
+- `session-start` — Injects the using-open-coleslaw skill into every session
+- `stop` — On cycle completion, checks context usage and suggests /compact or /clear
 
 ## Agent Tiers
 | Tier | Model | Role |
 |------|-------|------|
-| Orchestrator | claude-opus-4-6 (1M) | Full-picture routing, delegation |
-| Leader | claude-sonnet-4-6 | Meetings, technical decisions |
-| Worker (impl) | claude-sonnet-4-6 | Code, implementation |
-| Worker (research) | claude-haiku-4-5 | Quick lookups |
+| Orchestrator (subagent) | inherits from user session | Meeting runner |
+| Leader (specialist) | inherits from user session | Meeting participant |
+| Worker | inherits from user session | Implementation |
+
+No model is hard-coded. Every agent runs on whatever model the user's
+Claude Code session is configured with.
 
 ## Departments
+- Planning: meeting facilitation, MVP decomposition, consensus, minutes
 - Architecture: system design, API, schema
 - Engineering: implementation, code quality
-- QA: testing, security, performance
+- Verification: testing, security, performance, post-implementation runs
 - Product: requirements, user stories
 - Research: codebase exploration, docs
 
 ## Meeting Minutes
-Saved to: ~/.open-coleslaw/minutes/
-Index: ~/.open-coleslaw/minutes/INDEX.md
-Format: PRD with frontmatter metadata + tags
+Saved to: `{project}/docs/open-coleslaw/`
+Index: `{project}/docs/open-coleslaw/INDEX.md`
+Format: PRD with decisions, rationale, action items, open questions

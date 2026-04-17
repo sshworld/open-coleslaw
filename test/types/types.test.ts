@@ -14,10 +14,9 @@ describe('type constants', () => {
       expect(Object.keys(TIER_CONFIGS)).toHaveLength(3);
     });
 
-    it('should have a model string for each tier', () => {
+    it('should NOT hard-code a model for any tier (inherited from session)', () => {
       for (const tier of ['orchestrator', 'leader', 'worker'] as const) {
-        expect(TIER_CONFIGS[tier].model).toBeTypeOf('string');
-        expect(TIER_CONFIGS[tier].model.length).toBeGreaterThan(0);
+        expect(TIER_CONFIGS[tier].model).toBeUndefined();
       }
     });
 
@@ -93,9 +92,8 @@ describe('type constants', () => {
       expect(DEFAULT_MEETING_CONFIG.convergenceThreshold).toBeLessThanOrEqual(1);
     });
 
-    it('should have a model string', () => {
-      expect(DEFAULT_MEETING_CONFIG.model).toBeTypeOf('string');
-      expect(DEFAULT_MEETING_CONFIG.model.length).toBeGreaterThan(0);
+    it('should NOT hard-code a model (inherited from session)', () => {
+      expect(DEFAULT_MEETING_CONFIG.model).toBeUndefined();
     });
   });
 });

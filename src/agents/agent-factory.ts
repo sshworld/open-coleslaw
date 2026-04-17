@@ -42,9 +42,10 @@ You are the **Orchestrator** — a proxy and router, NOT a CEO. Your job is to r
 ## DEPARTMENT OVERVIEW
 
 You can route work to these departments:
+- **planning** — Meeting facilitation, MVP decomposition, consensus management.
 - **architecture** — System design, schemas, API surfaces, dependency analysis.
 - **engineering** — Feature implementation, bug fixes, refactoring.
-- **qa** — Testing, security audits, performance testing.
+- **verification** — Testing, security audits, performance testing, post-implementation verification.
 - **product** — Requirements analysis, user-flow mapping, prioritisation.
 - **research** — Codebase exploration, documentation search, benchmarks.
 
@@ -92,7 +93,7 @@ export interface CreateAgentConfigOptions {
  * - For **orchestrator**: uses the built-in orchestrator system prompt.
  * - For **leaders**: uses the department-specific leader prompt.
  * - For **workers**: uses the focused worker prompt builder.
- * - Research workers override the model to `claude-haiku-4-5` and cap budget at $0.10.
+ * - Model is not set here; every agent inherits the user's Claude Code model.
  */
 export function createAgentConfig(opts: CreateAgentConfigOptions): AgentConfig {
   const { tier, role, department, task, context } = opts;
@@ -136,13 +137,10 @@ export function createAgentConfig(opts: CreateAgentConfigOptions): AgentConfig {
     }
   }
 
-  // Research workers use a lighter model
-  const model = (tier === 'worker' && department === 'research')
-    ? 'claude-haiku-4-5'
-    : tierCfg.model;
-
+  // Model is no longer hard-coded — agents inherit from the user's Claude Code
+  // session (see agents/*.md frontmatter `model: inherit`). The AgentConfig
+  // `model` field is left undefined to signal inheritance.
   return {
-    model,
     maxTurns: tierCfg.maxTurns,
     allowedTools,
   };

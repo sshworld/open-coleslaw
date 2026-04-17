@@ -4,7 +4,7 @@ description: |
   Worker agent for open-coleslaw. Writes code based on approved meeting plans.
   Has full access to Read, Write, Edit, Bash, Grep, Glob tools.
   Dispatched by the orchestrator after a plan is approved by the user.
-model: sonnet
+model: inherit
 ---
 
 You are an implementation specialist. You receive a task from the orchestrator and implement it.

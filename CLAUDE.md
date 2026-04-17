@@ -65,10 +65,13 @@ src/
 ## Agent Tiers
 | Tier | Model | Role |
 |------|-------|------|
-| Orchestrator | claude-opus-4-6 (1M) | Full-picture routing, delegation, MVP cycles |
-| Leader | claude-sonnet-4-6 | Meetings, technical decisions, consensus stance |
-| Worker (impl) | claude-sonnet-4-6 | Code, implementation |
-| Worker (research) | claude-haiku-4-5 | Quick lookups |
+| Orchestrator (subagent) | inherits from user session | Meeting runner (only) |
+| Leader (specialists) | inherits from user session | Meeting participant |
+| Worker | inherits from user session | Implementation |
+
+**No model hard-coding anywhere.** All `agents/*.md` files use `model: inherit`.
+`TIER_CONFIGS` in `src/types/agent.ts` has `maxTurns` only — no `model` field.
+Switching `/model` in the user's Claude Code session changes the whole pipeline.
 
 Specialist leader roles: `planner`, `architect`, `engineer`, `verifier`, `product-manager`, `researcher`.
 
@@ -90,15 +93,26 @@ Specialist leader roles: `planner`, `architect`, `engineer`, `verifier`, `produc
 - Node.js >= 18 required
 
 ## Key Decisions
-- Orchestrator is user's proxy/delegate, NOT CEO
+- **2-phase pipeline** — Phase A (orchestrator subagent) runs meetings only;
+  Phase B (main Claude session) runs Plan Mode + workers + verification.
+  Reason: `EnterPlanMode` does NOT work from a dispatched subagent.
+- **Orchestrator returns a structured `coleslaw-result` block** (minutesPaths,
+  mvps, currentMvp, plan{context, files, tasks, acceptance}) for the main
+  session to parse and act on.
+- **Model inheritance everywhere** — no hard-coded model names. Agent .md
+  files use `model: inherit`; `TIER_CONFIGS` has no `model` field.
+- **Agents respond in the user's language** — detect from the original
+  request and propagate through orchestrator → specialists. Minutes in the
+  same language.
 - Kickoff meeting breaks user request into ordered MVPs before any design meeting
 - Meetings terminate on **consensus**, not round count (MAX_ROUNDS=10 escalates to @mention)
 - Planner always attends; facilitates and synthesizes, doesn't take technical positions
 - Dynamic attendee selection — not every specialist attends every meeting
-- Workers spawned on-demand by the orchestrator (Agent tool), destroyed after task completion
+- Workers dispatched by the **main session** (not the orchestrator subagent),
+  destroyed after task completion.
 - Minutes saved to project's `docs/open-coleslaw/` with INDEX.md (per-project, survives compact/clear)
 - Dashboard renders a **meeting thread + comments UI**; browser comments flow through a file queue
 - Stop hook checks context usage at cycle end (`.cycle-complete` marker) and suggests `/compact` or `/clear` above ~30%
 - Self-extending: creates new capabilities on demand
 - Rule priority: rules.md > CLAUDE.md > conversation context
-- MVP cycle: kickoff -> (per MVP: design -> plan -> workers -> verify -> fail? verify-retry)
+- MVP cycle: kickoff -> (per MVP: design -> plan (main session) -> workers (main session) -> verify -> fail? verify-retry)

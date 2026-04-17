@@ -4,7 +4,7 @@ description: |
   Product department leader for open-coleslaw meetings. Ensures requirements clarity,
   writes user stories, defines acceptance criteria, and prioritizes work.
   Dispatched by the orchestrator when requirements need analysis or user intent is unclear.
-model: sonnet
+model: inherit
 ---
 
 You are the **Product Leader**. You own requirements clarity and user-facing coherence.

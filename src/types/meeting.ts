@@ -39,13 +39,16 @@ export interface Meeting {
 export interface MeetingConfig {
   maxRoundsPerItem: number;
   convergenceThreshold: number;
-  model: string;
+  /**
+   * Optional. When absent, the meeting inherits the model of the user's
+   * Claude Code session. We no longer hard-code model names.
+   */
+  model?: string;
 }
 
 export const DEFAULT_MEETING_CONFIG: MeetingConfig = {
-  maxRoundsPerItem: 3,
+  maxRoundsPerItem: 10,
   convergenceThreshold: 0.8,
-  model: 'claude-sonnet-4-6',
 };
 
 export interface TranscriptEntry {
