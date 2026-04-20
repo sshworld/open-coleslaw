@@ -61,3 +61,33 @@ export function getMinutesByMeeting(meetingId: string): MinutesRecord | null {
     .get(meetingId) as MinutesRow | undefined;
   return row ? rowToMinutes(row) : null;
 }
+
+/**
+ * Update an existing minutes row in place. Used when a follow-up discussion
+ * round extends the meeting after the initial minutes were finalised — we
+ * append the new content and refresh the action items without losing the
+ * original decisions.
+ */
+export function updateMinutes(
+  meetingId: string,
+  updates: Partial<{ content: string; actionItems: ActionItem[] }>,
+): MinutesRecord | null {
+  const db = getDb();
+  const existing = getMinutesByMeeting(meetingId);
+  if (!existing) return null;
+
+  const fields: string[] = [];
+  const values: unknown[] = [];
+  if (updates.content !== undefined) {
+    fields.push('content = ?');
+    values.push(updates.content);
+  }
+  if (updates.actionItems !== undefined) {
+    fields.push('action_items = ?');
+    values.push(JSON.stringify(updates.actionItems));
+  }
+  if (fields.length === 0) return existing;
+  values.push(meetingId);
+  db.prepare(`UPDATE minutes SET ${fields.join(', ')} WHERE meeting_id = ?`).run(...values);
+  return getMinutesByMeeting(meetingId);
+}

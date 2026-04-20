@@ -263,6 +263,36 @@ Two channels inject user turns into the current meeting:
 
 User turns are the highest-weight voice — update proposals immediately.
 
+## Follow-up Discussion (after minutes are finalised)
+
+If more discussion happens **after** `generate-minutes` was called — for
+example:
+- user replies in the terminal or browser after the approve gate
+- a verify-retry meeting sends fresh transcripts back to the original design meeting via `chain-meeting`
+- another consensus round is triggered mid-implementation
+
+…you MUST re-fold those turns into the existing minutes. The pipeline does
+NOT lose them silently; the responsibility is yours:
+
+1. `add-transcript(...)` each new speaker turn (user + specialists) to the
+   same `meetingId`. Adding transcripts to a completed meeting is allowed —
+   no code blocks it.
+2. Call `generate-minutes({ meetingId })` **again**. The tool is idempotent
+   and append-aware: it detects the new transcripts, appends a
+   `## Follow-up Discussion — <timestamp>` section to the existing minutes
+   (keeping the original Decisions / Action Items intact), and returns the
+   updated content.
+3. Overwrite the markdown file on disk (`docs/open-coleslaw/YYYY-MM-DD_*.md`)
+   with the new content returned from `generate-minutes`. Do NOT create a
+   second file — the same minutes file grows in place.
+4. If the follow-up changes the action items, also patch the `update-mvps`
+   status if it affects an MVP's completion state.
+
+**Silent failure mode (forbidden)**: adding user / specialist transcripts
+and then skipping the re-`generate-minutes` + file-overwrite step. Symptom:
+dashboard thread shows the new comments, but the markdown on disk freezes
+at the original snapshot and the user feels their follow-up "disappeared."
+
 ## Red Flags — STOP
 
 | Thought | Reality |
@@ -282,6 +312,7 @@ User turns are the highest-weight voice — update proposals immediately.
 | "User picked the 'Other' / 4th option so I'll just record it and move on" | FORBIDDEN. Any non-default, custom, or out-of-options answer is **new constraints**. Re-dispatch planner in clarify sub-mode with the custom answer included — do not skip to decompose. |
 | "User rejected the plan but I already captured their feedback as a transcript" | FORBIDDEN. Recording the rejection is step one. Step two is `chain-meeting` and running a **new full design meeting** with that feedback pre-seeded. Do not patch the plan yourself and re-`ExitPlanMode`. |
 | "User said something ambiguous after ExitPlanMode, I'll assume approve" | FORBIDDEN. Only treat as approve if the reply is an unambiguous yes. Any pushback / question / alternative / "wait" / "아니" / "다른 방향" = REJECT → re-open meeting. When in doubt, re-open. |
+| "Minutes are already generated, I can just add the user's follow-up to the thread and call it done" | FORBIDDEN. The dashboard thread will show the comment but the markdown on disk will freeze. You MUST call `generate-minutes` AGAIN (it's idempotent and append-aware) and overwrite the markdown file with the new content. |
 | "User asked in Korean so I'll reply in English" | Match the user's language in every transcript and minute. |
 
 ## Dashboard

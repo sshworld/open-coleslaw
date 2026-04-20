@@ -9,6 +9,7 @@ import {
   updateMeeting,
   createMinutes,
   getMinutesByMeeting,
+  updateMinutes,
 } from '../storage/index.js';
 import { getDb } from '../storage/db.js';
 import { logger } from '../utils/logger.js';
@@ -139,6 +140,55 @@ export class MeetingRunner {
     const meeting = getMeeting(this.meetingId);
     if (!meeting) {
       throw new Error(`Meeting not found: ${this.meetingId}`);
+    }
+
+    // Idempotent / follow-up-aware: if minutes already exist and the
+    // transcript has grown since they were written, fold the new entries
+    // into a "Follow-up Discussion" section appended to the existing
+    // content. If no new entries, return the existing minutes unchanged.
+    const existing = getMinutesByMeeting(this.meetingId);
+    if (existing) {
+      const newEntries = getTranscript(this.meetingId).filter(
+        (e) => e.createdAt > existing.createdAt,
+      );
+      if (newEntries.length === 0) {
+        logger.info('generateMinutes: no new transcripts since last minutes; returning existing', {
+          meetingId: this.meetingId,
+        });
+        return existing.id;
+      }
+
+      const appended: string[] = [];
+      appended.push(existing.content.replace(/\s+$/, ''));
+      appended.push('');
+      appended.push(
+        `## Follow-up Discussion — ${new Date().toISOString()}`,
+      );
+      appended.push('');
+      for (const e of newEntries) {
+        const stanceNote =
+          e.agendaItemIndex === -3
+            ? '_(user comment)_'
+            : e.agendaItemIndex === -2
+              ? '_(synthesis)_'
+              : '';
+        appended.push(
+          `**${e.speakerRole}** (round ${e.roundNumber}) ${stanceNote}:`,
+        );
+        appended.push(e.content);
+        appended.push('');
+      }
+      const newContent = appended.join('\n');
+      updateMinutes(this.meetingId, { content: newContent });
+      updateMeeting(this.meetingId, {
+        status: 'completed' as MeetingStatus,
+        completedAt: Date.now(),
+      });
+      logger.info('Minutes appended with follow-up discussion', {
+        meetingId: this.meetingId,
+        newEntries: newEntries.length,
+      });
+      return existing.id;
     }
 
     // Update phase

@@ -175,6 +175,18 @@ describe('plugin structure — skills', () => {
     expect(md.toLowerCase()).toMatch(/recording.*without.*re-engag|recording the rejection/);
   });
 
+  it('using-open-coleslaw skill mandates follow-up minutes regeneration (v0.6.8)', () => {
+    const md = readFileSync(join(SKILLS, 'using-open-coleslaw', 'SKILL.md'), 'utf-8');
+    // Section header
+    expect(md).toMatch(/Follow-up Discussion/);
+    // Main session must re-call generate-minutes after follow-up turns
+    expect(md).toMatch(/generate-minutes.*again|again.*generate-minutes/i);
+    // Must explicitly instruct to overwrite the markdown file
+    expect(md.toLowerCase()).toMatch(/overwrite the markdown file|overwrite.*\.md/);
+    // Must forbid the silent-freeze failure mode
+    expect(md.toLowerCase()).toMatch(/silent failure|disappear|freeze[sd]? at/);
+  });
+
   it('using-open-coleslaw skill wires update-mvps at the three required points (v0.6.7)', () => {
     const md = readFileSync(join(SKILLS, 'using-open-coleslaw', 'SKILL.md'), 'utf-8');
     // Must mention update-mvps
