@@ -20,6 +20,7 @@ import type {
   SessionSnapshot,
   MultiSessionSnapshot,
   SessionDelta,
+  PlanState,
 } from '../types/dashboard-events.js';
 import { logger } from '../utils/logger.js';
 import { hydratePastMeetings } from './minutes-hydrator.js';
@@ -36,6 +37,21 @@ interface ProjectState {
   pastMeetings: MeetingThread[];
   mvps: MvpSummary[];
   totalCost: number;
+  planState: PlanState;
+}
+
+function emptyPlanState(): PlanState {
+  return {
+    active: false,
+    cycle: null,
+    phase: null,
+    questions: null,
+    answers: null,
+    plan: null,
+    outcome: null,
+    feedback: null,
+    updatedAt: null,
+  };
 }
 
 export class StateBridge extends EventEmitter {
@@ -82,6 +98,7 @@ export class StateBridge extends EventEmitter {
       pastMeetings: [],
       mvps: [],
       totalCost: 0,
+      planState: emptyPlanState(),
     };
     this.projects.set(info.projectPath, state);
     this.sessionToProject.set(info.sessionId, info.projectPath);
@@ -189,6 +206,7 @@ export class StateBridge extends EventEmitter {
           pastMeetings: [...s.pastMeetings],
           mvps: [...s.mvps],
           totalCost: s.totalCost,
+          planState: { ...s.planState },
         }),
       ),
     };
@@ -285,6 +303,51 @@ export class StateBridge extends EventEmitter {
       }
       case 'cost_update': {
         project.totalCost = event.totalCost;
+        break;
+      }
+      case 'plan_state': {
+        const now = Date.now();
+        const ps = project.planState;
+        ps.updatedAt = now;
+        switch (event.phase) {
+          case 'entered':
+            ps.active = true;
+            ps.cycle = event.cycle ?? ps.cycle;
+            ps.phase = 'entered';
+            ps.questions = null;
+            ps.answers = null;
+            ps.plan = null;
+            ps.outcome = null;
+            ps.feedback = null;
+            break;
+          case 'clarify-asked':
+            ps.active = true;
+            ps.phase = 'clarify-asked';
+            ps.questions = event.questions ? [...event.questions] : null;
+            ps.answers = null;
+            break;
+          case 'clarify-answered':
+            ps.active = true;
+            ps.phase = 'clarify-answered';
+            ps.answers = event.answers ? [...event.answers] : null;
+            break;
+          case 'plan-presented':
+            ps.active = true;
+            ps.phase = 'plan-presented';
+            ps.plan = event.plan ?? null;
+            ps.outcome = null;
+            ps.feedback = null;
+            break;
+          case 'resolved':
+            ps.phase = 'resolved';
+            ps.outcome = event.outcome ?? null;
+            ps.feedback = event.feedback ?? null;
+            // Plan mode is exited after resolution unless the user rejected
+            // (in which case main session stays in plan mode for re-meeting,
+            // but we still show the rejection outcome until the next phase).
+            ps.active = event.outcome === 'rejected';
+            break;
+        }
         break;
       }
       case 'mention_created':

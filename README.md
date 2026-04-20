@@ -115,6 +115,7 @@ When all MVPs pass verification, the main session touches a marker file and the 
 A live meeting viewer at **http://localhost:35143**:
 
 - **Current meeting as a thread** — speakers post comments, stance badges (AGREE / DISAGREE / SPEAKING) appear inline
+- **Plan-mode panel** — mirrors Claude Code's plan mode live: entering plan mode, clarify questions + options, user picks, the presented plan, and the approval outcome (auto-accept / manual-approve / rejected)
 - **MVP progress panel** — pending / in-progress / done
 - **Comment from the browser** — type a note straight into the meeting; it's picked up at the next round boundary
 - **Per-project tabs** — multiple terminals on the same project merge into one tab
@@ -157,14 +158,15 @@ See [`CLAUDE.md`](CLAUDE.md) and [`docs/smoke-tests.md`](docs/smoke-tests.md) be
 ---
 
 <details>
-<summary><strong>🛠 16 MCP tools</strong> (the pipeline calls these — you don't)</summary>
+<summary><strong>🛠 17 MCP tools</strong> (the pipeline calls these — you don't)</summary>
 
 | Tool | What it does |
 |------|-------------|
 | `start-meeting` | Creates a meeting record (kickoff / design / verify-retry) |
 | `add-transcript` | Saves a speaker's turn |
-| `generate-minutes` | Writes PRD minutes from transcripts |
+| `generate-minutes` | Writes PRD minutes from transcripts (idempotent; appends follow-up discussion) |
 | `update-mvps` | Upserts the MVP list or patches one MVP's status; powers the dashboard sidebar |
+| `announce-plan-state` | Mirrors Claude Code plan-mode lifecycle to the dashboard (entered / clarify-asked / clarify-answered / plan-presented / resolved) |
 | `get-meeting-status` | Reads meeting progress |
 | `get-minutes` | Retrieves full / summary / tasks-only minutes |
 | `execute-tasks` | Returns the structured task list from minutes for worker dispatch |

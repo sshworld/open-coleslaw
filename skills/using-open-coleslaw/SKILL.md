@@ -36,8 +36,12 @@ planner** (kickoff or per-MVP design), you are entering planning. Therefore:
 
 1. Call `EnterPlanMode()` **before** the first planner dispatch of the current
    planning cycle.
-2. Stay in plan mode through Phase 1 (Clarify + Kickoff) and Phase 2 (Design).
-3. Exit plan mode only at Phase 3 via `ExitPlanMode({ plan })`.
+2. **Mirror to the dashboard (MANDATORY)**: immediately after `EnterPlanMode`,
+   call `announce-plan-state({ phase: "entered", cycle: "kickoff" | "design" | "verify-retry" })`.
+   Without this call the dashboard has no idea plan mode is active.
+3. Stay in plan mode through Phase 1 (Clarify + Kickoff) and Phase 2 (Design).
+4. Exit plan mode only at Phase 3 via `ExitPlanMode({ plan })` — and announce
+   the `plan-presented` + `resolved` phases around it.
 
 Why plan mode for the whole meeting:
 - MCP tools (`start-meeting`, `add-transcript`, `generate-minutes`) work in plan mode.
@@ -77,11 +81,17 @@ into an ordered MVP list, and first asks the user back if anything is fuzzy.
 
    **If the planner returned `NEEDS_CLARIFICATION`:**
    - Parse the structured questions list.
+   - **Mirror to the dashboard (MANDATORY)**: before the actual
+     `AskUserQuestion` call, announce via `announce-plan-state({ phase: "clarify-asked", questions: [...] })`
+     with the parsed questions + options so the dashboard sidebar shows
+     them.
    - Call `AskUserQuestion({ questions: [...] })` translating each planner
      question into the tool's schema (question + multiSelect:false + options).
      **Always include a final "다른 의견 / Other" open-text option** for every
      question so the user can override your predefined choices.
    - Wait for the user's answers.
+   - **Mirror to the dashboard (MANDATORY)**: after answers arrive, call
+     `announce-plan-state({ phase: "clarify-answered", answers: [...] })`.
    - `add-transcript` the user's answers with `speakerRole: "user", agendaItemIndex: 0, roundNumber: 1, stance: "speaking"`.
    - **Non-default / custom answer handling (MANDATORY)**: if ANY answer was
      the "Other" free-text option OR the user's reply diverges from your
@@ -185,8 +195,12 @@ decisions, rationale, and action items. Now surface them as the plan.
    - Files to create/modify
    - Ordered tasks (one per worker)
    - Acceptance / verification
-2. Call `ExitPlanMode({ plan: <plan string> })`.
-3. **Rejection detection (MANDATORY — do not skip)**: After `ExitPlanMode`,
+2. **Mirror to the dashboard (MANDATORY)**: call
+   `announce-plan-state({ phase: "plan-presented", plan: <plan string> })`
+   **before** `ExitPlanMode`. This lets browser users see the exact plan
+   being surfaced in the terminal.
+3. Call `ExitPlanMode({ plan: <plan string> })`.
+4. **Rejection detection (MANDATORY — do not skip)**: After `ExitPlanMode`,
    check what the user returned. The plan is ONLY approved when the user's
    response is an unambiguous approval (e.g., "approve", "yes", "go ahead",
    "진행해", empty + continue, or Claude Code's native "plan approved" signal).
@@ -200,8 +214,9 @@ decisions, rationale, and action items. Now surface them as the plan.
      "이건 Y 해야 하지 않나?")
 
    When rejected: `add-transcript` the user's feedback with
-   `speakerRole: "user", stance: "disagree"`, then follow step 3.
-3a. **Rejected — you MUST re-open a meeting, not just record feedback**:
+   `speakerRole: "user", stance: "disagree"`, then follow step 5 below.
+5. **Rejected — you MUST re-open a meeting, not just record feedback**:
+   - Announce to dashboard: `announce-plan-state({ phase: "resolved", outcome: "rejected", feedback: "<summary of user's pushback>" })`.
    - You are still in plan mode. Do NOT call `ExitPlanMode` again with the
      same plan.
    - Call `chain-meeting({ fromMeetingId: <current>, newTopic: "<rejection summary>", meetingType: "design" | "verify-retry" })`.
@@ -209,19 +224,21 @@ decisions, rationale, and action items. Now surface them as the plan.
      design round** with the user's feedback pre-seeded in the opening
      transcript as the highest-weight input.
    - Only after the new consensus is reached and a revised plan is
-     synthesised do you call `ExitPlanMode` again.
+     synthesised do you call `ExitPlanMode` again (and announce `plan-presented` / `resolved` again).
    - **Silent failure mode (forbidden)**: recording the user's feedback via
      `add-transcript` and then doing nothing — or trying to patch the plan
      yourself without re-convening specialists — is a regression. The user
      pushed back; the pipeline owes them another meeting.
-4. **Approved** — you are now out of plan mode. IMMEDIATELY perform the
-   deferred disk writes:
+6. **Approved** — Claude Code's ExitPlanMode returns the user's choice
+   (auto-accept vs manual-approve). Announce it immediately:
+   `announce-plan-state({ phase: "resolved", outcome: "auto-accept" | "manual-approve" })`.
+   You are now out of plan mode. IMMEDIATELY perform the deferred disk writes:
    - Write kickoff markdown to `<cwd>/docs/open-coleslaw/YYYY-MM-DD_kickoff_<slug>.md`
      (only if this is the first MVP of the session).
    - Write design markdown to `<cwd>/docs/open-coleslaw/YYYY-MM-DD_<seq>_<mvp-slug>.md`.
    - Create/update `<cwd>/docs/open-coleslaw/INDEX.md` with the MVP checklist.
    - Consume any queued `.pending-comments.jsonl` entries you saw during the meeting.
-5. Go to Phase 4.
+7. Go to Phase 4.
 
 ## Phase 4 — Implementation
 

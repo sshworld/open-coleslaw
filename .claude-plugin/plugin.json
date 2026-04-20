@@ -1,7 +1,7 @@
 {
   "name": "open-coleslaw",
   "description": "Multi-agent orchestrator for Claude Code. Like coleslaw — just scoop and eat. Your AI team is already hired.",
-  "version": "0.6.8",
+  "version": "0.6.9",
   "author": {
     "name": "sshworld",
     "email": "ssh97540@gmail.com"

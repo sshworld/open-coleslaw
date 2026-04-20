@@ -31,6 +31,8 @@ import {
   generateMinutesHandler,
   updateMvpsSchema,
   updateMvpsHandler,
+  announcePlanStateSchema,
+  announcePlanStateHandler,
 } from './tools/index.js';
 
 export function createServer(): McpServer {
@@ -164,6 +166,14 @@ export function createServer(): McpServer {
     'Upsert the full per-kickoff MVP list (pass `mvps`) OR patch a single MVP status (pass `patch`). Emits `mvp_progress` so the dashboard sidebar stays in sync. Call after kickoff decompose, when each MVP design meeting starts, and when verifier PASS/FAIL finalises an MVP.',
     updateMvpsSchema,
     updateMvpsHandler,
+  );
+
+  // 17. announce-plan-state
+  server.tool(
+    'announce-plan-state',
+    'Mirror Claude Code plan-mode lifecycle to the dashboard. Call with `phase: "entered"` right before EnterPlanMode, `phase: "clarify-asked"` before AskUserQuestion (include `questions`), `phase: "clarify-answered"` after answers arrive, `phase: "plan-presented"` before ExitPlanMode (include `plan`), and `phase: "resolved"` after user accepts or rejects (include `outcome` and for rejections `feedback`).',
+    announcePlanStateSchema,
+    announcePlanStateHandler,
   );
 
   return server;

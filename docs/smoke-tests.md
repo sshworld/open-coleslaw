@@ -89,6 +89,20 @@ INSIDE plan mode; the synthesised plan surfaces via `ExitPlanMode`.
 - [ ] **Markdown files in `docs/open-coleslaw/` appear AFTER approve, not during the meeting**
 - [ ] For MVP-2+: Plan Mode re-enters at the start of the next design meeting (no fresh kickoff)
 
+### 5b. Plan-mode mirroring on dashboard (v0.6.9)
+
+- [ ] Before the first planner dispatch the dashboard header shows a purple
+      `PLAN MODE — opening (kickoff)` pill
+- [ ] When clarify questions appear, the sidebar "Plan Mode" panel lists them
+      with their predefined options
+- [ ] After the user picks answers, the same panel shows `User picks: ...`
+- [ ] When the plan is surfaced via ExitPlanMode, the panel shows the plan text
+      preview and the phase label changes to "Plan presented — awaiting approval"
+- [ ] After the user accepts, the outcome badge `AUTO-ACCEPT` or
+      `MANUAL-APPROVE` appears; the header pill disappears
+- [ ] If the user rejects, the outcome badge `REJECTED` with feedback text
+      appears; the header pill stays active until the next plan is presented
+
 ### 5a. Non-default / rejection handling (v0.6.6 regression guard)
 
 - [ ] In `AskUserQuestion`, every question has an **"다른 의견 / Other"** free-text option

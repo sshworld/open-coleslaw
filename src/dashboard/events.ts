@@ -79,5 +79,7 @@ export function summarizeEvent(event: AgentEvent): string {
       return `[@RESOLVED] ${event.mentionId}: ${event.decision}`;
     case 'cost_update':
       return `[COST] Total: $${event.totalCost.toFixed(4)}`;
+    case 'plan_state':
+      return `[PLAN-MODE] ${event.phase}${event.cycle ? ` (${event.cycle})` : ''}${event.outcome ? ` → ${event.outcome}` : ''}`;
   }
 }

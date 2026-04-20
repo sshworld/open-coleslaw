@@ -105,7 +105,58 @@ export type AgentEvent =
       mentionId: string;
       decision: string;
     }
-  | { kind: 'cost_update'; totalCost: number };
+  | { kind: 'cost_update'; totalCost: number }
+  | {
+      kind: 'plan_state';
+      /**
+       * `entered`          — main session just called EnterPlanMode.
+       * `clarify-asked`    — planner returned NEEDS_CLARIFICATION and we're
+       *                      about to surface the questions via AskUserQuestion.
+       * `clarify-answered` — user's answers came back; decompose begins.
+       * `plan-presented`   — plan passed to ExitPlanMode, awaiting user.
+       * `resolved`         — plan was accepted (auto / manual) or rejected.
+       */
+      phase:
+        | 'entered'
+        | 'clarify-asked'
+        | 'clarify-answered'
+        | 'plan-presented'
+        | 'resolved';
+      /** Which cycle the plan mode wraps: kickoff, per-MVP design, or verify-retry. */
+      cycle?: 'kickoff' | 'design' | 'verify-retry';
+      /** The clarify questions (populated on clarify-asked). */
+      questions?: Array<{ id: string; question: string; options: string[] }>;
+      /** The user's picks (populated on clarify-answered). */
+      answers?: Array<{ id: string; picked: string }>;
+      /** The plan text sent to ExitPlanMode (populated on plan-presented). */
+      plan?: string;
+      /** How the user resolved the plan. Populated on `resolved`. */
+      outcome?: 'auto-accept' | 'manual-approve' | 'rejected';
+      /** User's rejection feedback (populated when outcome === 'rejected'). */
+      feedback?: string;
+    };
+
+// ---------------------------------------------------------------------------
+// Plan-mode state snapshot (for the dashboard sidebar panel)
+// ---------------------------------------------------------------------------
+
+export interface PlanState {
+  active: boolean;
+  cycle: 'kickoff' | 'design' | 'verify-retry' | null;
+  phase:
+    | 'entered'
+    | 'clarify-asked'
+    | 'clarify-answered'
+    | 'plan-presented'
+    | 'resolved'
+    | null;
+  questions: Array<{ id: string; question: string; options: string[] }> | null;
+  answers: Array<{ id: string; picked: string }> | null;
+  plan: string | null;
+  outcome: 'auto-accept' | 'manual-approve' | 'rejected' | null;
+  feedback: string | null;
+  updatedAt: number | null;
+}
 
 // ---------------------------------------------------------------------------
 // Multi-session types (dashboard owner + remote MCP clients)
@@ -159,6 +210,7 @@ export interface SessionSnapshot {
   pastMeetings: MeetingThread[]; // last N finished threads
   mvps: MvpSummary[];
   totalCost: number;
+  planState: PlanState;
 }
 
 export interface MultiSessionSnapshot {

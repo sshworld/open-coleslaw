@@ -175,6 +175,20 @@ describe('plugin structure — skills', () => {
     expect(md.toLowerCase()).toMatch(/recording.*without.*re-engag|recording the rejection/);
   });
 
+  it('using-open-coleslaw skill mirrors plan-mode lifecycle to dashboard (v0.6.9)', () => {
+    const md = readFileSync(join(SKILLS, 'using-open-coleslaw', 'SKILL.md'), 'utf-8');
+    // Must use the announce-plan-state MCP tool at 5 lifecycle phases
+    expect(md).toMatch(/announce-plan-state[^\n]*"entered"/);
+    expect(md).toMatch(/announce-plan-state[^\n]*"clarify-asked"/);
+    expect(md).toMatch(/announce-plan-state[^\n]*"clarify-answered"/);
+    expect(md).toMatch(/announce-plan-state[^\n]*"plan-presented"/);
+    expect(md).toMatch(/announce-plan-state[^\n]*"resolved"/);
+    // Both outcomes must appear (auto-accept / manual-approve / rejected)
+    expect(md).toMatch(/auto-accept/);
+    expect(md).toMatch(/manual-approve/);
+    expect(md).toMatch(/outcome:\s*"rejected"/);
+  });
+
   it('using-open-coleslaw skill mandates follow-up minutes regeneration (v0.6.8)', () => {
     const md = readFileSync(join(SKILLS, 'using-open-coleslaw', 'SKILL.md'), 'utf-8');
     // Section header

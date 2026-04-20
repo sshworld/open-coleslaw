@@ -203,6 +203,105 @@ html, body {
   opacity: 0.7;
 }
 
+/* Plan mode badge in the header */
+.header-mid { display: flex; justify-content: center; flex: 1; }
+.plan-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  border-radius: 14px;
+  background: rgba(168,85,247,0.15);
+  border: 1px solid rgba(168,85,247,0.5);
+  color: var(--purple);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  box-shadow: 0 0 10px rgba(168,85,247,0.25);
+}
+.plan-mode-badge.hidden { display: none; }
+.plan-mode-badge .pm-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--purple);
+  box-shadow: 0 0 8px rgba(168,85,247,0.8);
+  animation: pm-pulse 1.6s infinite;
+}
+@keyframes pm-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(0.75); }
+}
+
+/* Plan-state sidebar panel */
+#plan-state-panel .ps-phase {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--purple);
+  margin-bottom: 6px;
+}
+#plan-state-panel .ps-cycle {
+  font-size: 10px;
+  color: var(--text2);
+  margin-bottom: 10px;
+}
+#plan-state-panel .ps-questions,
+#plan-state-panel .ps-answers,
+#plan-state-panel .ps-plan,
+#plan-state-panel .ps-outcome {
+  font-size: 11px;
+  color: var(--text);
+  margin: 6px 0 10px 0;
+}
+#plan-state-panel .ps-questions ol,
+#plan-state-panel .ps-answers ul {
+  margin: 4px 0 0 14px;
+  padding: 0;
+}
+#plan-state-panel .ps-questions li,
+#plan-state-panel .ps-answers li {
+  margin: 4px 0;
+  color: var(--text2);
+}
+#plan-state-panel .ps-questions .q-opts {
+  display: block;
+  color: var(--text2);
+  font-size: 10px;
+  margin-left: 2px;
+  opacity: 0.75;
+}
+#plan-state-panel .ps-plan pre {
+  font-family: var(--font);
+  font-size: 10px;
+  color: var(--text2);
+  background: var(--surface2);
+  padding: 8px;
+  border-radius: 4px;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  border: 1px solid var(--border);
+}
+#plan-state-panel .ps-outcome {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+#plan-state-panel .ps-outcome.auto-accept { background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.4); }
+#plan-state-panel .ps-outcome.manual-approve { background: rgba(34,211,238,0.15); color: var(--lightcyan); border: 1px solid rgba(34,211,238,0.4); }
+#plan-state-panel .ps-outcome.rejected { background: rgba(239,68,68,0.15); color: var(--error); border: 1px solid rgba(239,68,68,0.4); }
+#plan-state-panel .ps-feedback {
+  display: block;
+  margin-top: 6px;
+  color: var(--text);
+  font-style: italic;
+  font-size: 11px;
+}
+
 /* viewing-past banner in the main area */
 #viewing-banner {
   display: none;
@@ -419,6 +518,12 @@ html, body {
 
   <div id="header">
     <div class="brand">🥬 Open Coleslaw</div>
+    <div class="header-mid">
+      <span id="plan-mode-badge" class="plan-mode-badge hidden">
+        <span class="pm-dot"></span>
+        <span id="plan-mode-label">PLAN MODE</span>
+      </span>
+    </div>
     <div class="status">
       <span id="conn-dot" class="conn-dot"></span>
       <span id="conn-text">Connecting…</span>
@@ -428,6 +533,10 @@ html, body {
   <div id="tab-bar"></div>
 
   <aside id="sidebar">
+    <div class="sidebar-section">
+      <h3>Plan Mode</h3>
+      <div id="plan-state-panel"><div class="empty" style="color:var(--text2);font-size:11px;">Not in plan mode</div></div>
+    </div>
     <div class="sidebar-section">
       <h3>MVP Progress</h3>
       <div id="mvp-list"><div class="empty">No MVPs yet</div></div>
@@ -537,6 +646,11 @@ function handleServerMessage(msg) {
         pastMeetings: [],
         mvps: [],
         totalCost: 0,
+        planState: {
+          active: false, cycle: null, phase: null,
+          questions: null, answers: null, plan: null,
+          outcome: null, feedback: null, updatedAt: null,
+        },
       });
       if (!state.activeSessionId) state.activeSessionId = msg.sessionId;
       renderAll();
@@ -618,6 +732,50 @@ function applyEvent(session, event) {
     case 'cost_update':
       session.totalCost = event.totalCost;
       break;
+    case 'plan_state': {
+      if (!session.planState) {
+        session.planState = {
+          active: false, cycle: null, phase: null,
+          questions: null, answers: null, plan: null,
+          outcome: null, feedback: null, updatedAt: null,
+        };
+      }
+      const ps = session.planState;
+      ps.updatedAt = Date.now();
+      switch (event.phase) {
+        case 'entered':
+          ps.active = true;
+          if (event.cycle) ps.cycle = event.cycle;
+          ps.phase = 'entered';
+          ps.questions = null; ps.answers = null; ps.plan = null;
+          ps.outcome = null; ps.feedback = null;
+          break;
+        case 'clarify-asked':
+          ps.active = true;
+          ps.phase = 'clarify-asked';
+          ps.questions = event.questions || null;
+          ps.answers = null;
+          break;
+        case 'clarify-answered':
+          ps.active = true;
+          ps.phase = 'clarify-answered';
+          ps.answers = event.answers || null;
+          break;
+        case 'plan-presented':
+          ps.active = true;
+          ps.phase = 'plan-presented';
+          ps.plan = event.plan || null;
+          ps.outcome = null; ps.feedback = null;
+          break;
+        case 'resolved':
+          ps.phase = 'resolved';
+          ps.outcome = event.outcome || null;
+          ps.feedback = event.feedback || null;
+          ps.active = event.outcome === 'rejected';
+          break;
+      }
+      break;
+    }
   }
 }
 
@@ -626,8 +784,26 @@ function applyEvent(session, event) {
 // -----------------------------------------------------------------
 function renderAll() {
   renderTabs();
+  renderPlanBadge();
   renderSidebar();
   renderMain();
+}
+
+function renderPlanBadge() {
+  const s = state.sessions.get(state.activeSessionId);
+  const badge = document.getElementById('plan-mode-badge');
+  const label = document.getElementById('plan-mode-label');
+  const ps = s && s.planState;
+  if (!ps || !ps.active) { badge.classList.add('hidden'); return; }
+  badge.classList.remove('hidden');
+  const phaseLabel = {
+    'entered': 'Plan mode — opening',
+    'clarify-asked': 'Plan mode — clarifying',
+    'clarify-answered': 'Plan mode — decomposing',
+    'plan-presented': 'Plan mode — awaiting approval',
+    'resolved': 'Plan mode — rejected, re-meeting',
+  }[ps.phase] || 'Plan mode';
+  label.textContent = phaseLabel + (ps.cycle ? ' (' + ps.cycle + ')' : '');
 }
 
 function renderTabs() {
@@ -648,9 +824,55 @@ function renderSidebar() {
   const s = state.sessions.get(state.activeSessionId);
   const mvpEl = document.getElementById('mvp-list');
   const pastEl = document.getElementById('past-list');
+  const planEl = document.getElementById('plan-state-panel');
   mvpEl.innerHTML = '';
   pastEl.innerHTML = '';
+  planEl.innerHTML = '';
   if (!s) return;
+
+  // Plan-mode panel
+  const ps = s.planState;
+  if (!ps || (!ps.active && !ps.outcome)) {
+    planEl.innerHTML = '<div class="empty" style="color:var(--text2);font-size:11px;">Not in plan mode</div>';
+  } else {
+    const parts = [];
+    const phaseLabel = {
+      'entered': 'Plan mode opened',
+      'clarify-asked': 'Awaiting user answers',
+      'clarify-answered': 'Decomposing after clarify',
+      'plan-presented': 'Plan presented — awaiting approval',
+      'resolved': ps.outcome === 'rejected' ? 'Plan rejected — re-meeting' : 'Plan accepted',
+    }[ps.phase] || 'Plan mode';
+    parts.push('<div class="ps-phase">' + escapeHtml(phaseLabel) + '</div>');
+    if (ps.cycle) parts.push('<div class="ps-cycle">Cycle: ' + escapeHtml(ps.cycle) + '</div>');
+    if (ps.questions && ps.questions.length) {
+      parts.push('<div class="ps-questions">Clarify questions:<ol>');
+      for (const q of ps.questions) {
+        parts.push(
+          '<li>' + escapeHtml(q.question) +
+            '<span class="q-opts">→ ' + q.options.map(escapeHtml).join(' / ') + '</span></li>',
+        );
+      }
+      parts.push('</ol></div>');
+    }
+    if (ps.answers && ps.answers.length) {
+      parts.push('<div class="ps-answers">User picks:<ul>');
+      for (const a of ps.answers) {
+        parts.push('<li>' + escapeHtml(a.id) + ': <strong>' + escapeHtml(a.picked) + '</strong></li>');
+      }
+      parts.push('</ul></div>');
+    }
+    if (ps.plan) {
+      parts.push('<div class="ps-plan">Plan:<pre>' + escapeHtml(ps.plan) + '</pre></div>');
+    }
+    if (ps.outcome) {
+      parts.push('<span class="ps-outcome ' + escapeHtml(ps.outcome) + '">' + escapeHtml(ps.outcome) + '</span>');
+      if (ps.feedback) {
+        parts.push('<span class="ps-feedback">"' + escapeHtml(ps.feedback) + '"</span>');
+      }
+    }
+    planEl.innerHTML = parts.join('');
+  }
 
   if (!s.mvps || s.mvps.length === 0) {
     mvpEl.innerHTML = '<div class="empty" style="color:var(--text2);font-size:11px;">No MVPs yet</div>';
