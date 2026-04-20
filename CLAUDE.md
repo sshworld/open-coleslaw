@@ -138,6 +138,16 @@ a version "ready".
 - **Agents respond in the user's language** — detect from the original
   request and propagate through orchestrator → specialists. Minutes in the
   same language.
+- **Plan-mode-wrapped cycle (v0.6.5+)** — the main session calls `EnterPlanMode()`
+  *before* the first planner dispatch of each planning cycle. The entire clarify +
+  kickoff + design meeting runs inside plan mode; the synthesised plan surfaces
+  via `ExitPlanMode({ plan })`. Disk writes (markdown minutes, INDEX.md, pending-
+  comments rotation) happen AFTER user approval, not during the meeting.
+- **Reverse-question clarify step (v0.6.5+)** — kickoff planner has two sub-modes:
+  `clarify` returns either `NEEDS_CLARIFICATION` (≤4 structured questions, each
+  with 2-5 concrete options) or the literal token `READY`. When questions come
+  back, the main session surfaces them via `AskUserQuestion` and re-dispatches
+  planner in `decompose` sub-mode with the answers.
 - Kickoff meeting breaks user request into ordered MVPs before any design meeting
 - Meetings terminate on **consensus**, not round count (MAX_ROUNDS=10 escalates to @mention)
 - Planner always attends; facilitates and synthesizes, doesn't take technical positions
@@ -149,4 +159,4 @@ a version "ready".
 - Stop hook checks context usage at cycle end (`.cycle-complete` marker) and suggests `/compact` or `/clear` above ~30%
 - Self-extending: creates new capabilities on demand
 - Rule priority: rules.md > CLAUDE.md > conversation context
-- MVP cycle: kickoff -> (per MVP: design -> plan -> workers -> verify -> fail? verify-retry). The main session runs every step.
+- MVP cycle: `EnterPlanMode` → kickoff (first MVP only) → design → `ExitPlanMode({ plan })` → user approves → workers → verify → fail? verify-retry (re-enter plan mode) → pass? next MVP re-enters plan mode. The main session runs every step.

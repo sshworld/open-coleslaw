@@ -7,7 +7,7 @@
 
 > **Type a prompt. Get a real multi-agent engineering team. No commands to learn.**
 
-Open Coleslaw is a multi-agent orchestrator plugin for [Claude Code](https://claude.com/claude-code). Every prompt runs through a **kickoff meeting → per-MVP design meeting → plan mode → parallel workers → verification** pipeline — with each speaker turn being a real `Agent` dispatch, not role-play.
+Open Coleslaw is a multi-agent orchestrator plugin for [Claude Code](https://claude.com/claude-code). Every prompt enters Claude Code's native **plan mode**, runs a **clarify → kickoff → per-MVP design meeting** cycle inside it, and surfaces the synthesised plan via `ExitPlanMode` — each speaker turn being a real `Agent` dispatch, not role-play.
 
 ![Open Coleslaw dashboard](docs/assets/dashboard.png)
 
@@ -36,9 +36,9 @@ That's it. Watch the meeting unfold at **http://localhost:35143**.
 
 | You type | The pipeline runs |
 |---|---|
-| `Build me a balance-game web app` | Kickoff → 3 MVPs → per-MVP design meeting → plan mode → workers → verified |
-| `Fix the flaky login test` | Kickoff (1 MVP) → design meeting w/ engineer + verifier → plan → fix → green |
-| `Should we migrate from Redux to Zustand?` | Design meeting w/ architect + engineer + researcher → minutes with recommendation |
+| `Build me a balance-game web app` | EnterPlanMode → planner asks 3-4 clarifying questions → MVP list → per-MVP design meeting → ExitPlanMode with plan → workers → verified |
+| `Fix the flaky login test` | EnterPlanMode → planner returns `READY` (no clarify) → 1-MVP design w/ engineer + verifier → ExitPlanMode → fix → green |
+| `Should we migrate from Redux to Zustand?` | EnterPlanMode → design meeting w/ architect + engineer + researcher → ExitPlanMode with a recommendation plan |
 
 You don't call a tool. You don't pick a department. You don't write prompt templates.
 The main Claude session **dispatches each specialist as a real subagent** and
@@ -131,7 +131,8 @@ Coleslaw is a side dish that's already made. You don't prepare it — you just e
 ### Key Decisions
 
 - **The orchestrator is your proxy, not a CEO.** You are the decision-maker. The orchestrator acts on your behalf but escalates important choices via `@mention`.
-- **Kickoff first.** Every non-trivial request starts by breaking itself into ordered MVPs.
+- **The meeting IS the plan.** Every planning cycle runs inside Claude Code's native plan mode. The `ExitPlanMode` approval is your checkpoint, not a separate step.
+- **Clarify first, then decompose.** Kickoff planner may ask up to 4 structured questions (via `AskUserQuestion`) before breaking the request into MVPs.
 - **Consensus, not round count.** A meeting ends when everyone actually agrees (or you're asked to break a tie).
 - **Minutes are the real artifact.** They survive `/compact` and `/clear` — your Claude Code context is disposable.
 - **TDD by default.** The engineer and verifier draft tests before workers start writing code.
