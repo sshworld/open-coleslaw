@@ -45,7 +45,9 @@ While the meeting is running:
 - [ ] A tab exists for the current project (e.g., "balance-game")
 - [ ] The main thread area populates with comments as each specialist is dispatched
 - [ ] Speaker avatars/colors differ per role (planner / architect / engineer / verifier)
-- [ ] "MVP Progress" sidebar shows the kickoff MVP list
+- [ ] "MVP Progress" sidebar shows the kickoff MVP list **after the planner's decompose step** (this requires the main session to call `update-mvps({ mvps: [...] })` — if the sidebar says "No MVPs yet" at verify time, the call is missing)
+- [ ] The MVP currently being designed shows as `IN-PROGRESS`; others `PENDING`
+- [ ] When a verifier reports PASS, that MVP switches to `DONE`; when FAIL it switches to `BLOCKED`
 - [ ] Comment box at the bottom is enabled (not greyed out) during the meeting
 - [ ] Opening the same project in a **second** terminal does **not** create
       a duplicate `balance-game (1)` tab — the existing tab stays

@@ -113,9 +113,22 @@ into an ordered MVP list, and first asks the user back if anything is fuzzy.
    `open-coleslaw:product-manager`, `add-transcript` their input, then
    re-dispatch planner once more for refinement.
 6. Call `generate-minutes({ meetingId })` to write the kickoff record to SQLite.
-7. **DO NOT** write the kickoff markdown file yet. You are still in plan mode
+7. **Register MVPs (MANDATORY)** — call `update-mvps`:
+   ```
+   update-mvps({
+     kickoffMeetingId: <current meetingId>,
+     mvps: [
+       { id: "mvp-1", title: "...", goal: "...", status: "in-progress", orderIndex: 0 },
+       { id: "mvp-2", title: "...", goal: "...", status: "pending",     orderIndex: 1 },
+       ...
+     ]
+   })
+   ```
+   This populates the dashboard's MVP Progress sidebar. Without this call the
+   sidebar stays empty even though the minutes contain the MVP list.
+8. **DO NOT** write the kickoff markdown file yet. You are still in plan mode
    — disk writes happen after Phase 3 approval.
-8. Hold the MVP list in working memory. Move straight to Phase 2 for MVP-1.
+9. Hold the MVP list in working memory. Move straight to Phase 2 for MVP-1.
 
 ## Phase 2 — Design Meeting (per MVP)
 
@@ -131,6 +144,7 @@ If you close a meeting without any `Agent(open-coleslaw:planner ...)` dispatch, 
 
 For the current MVP:
 
+0. **Mark this MVP as in-progress (MANDATORY)**: `update-mvps({ patch: { id: "<mvp-id>", status: "in-progress" } })`. This is how the dashboard's MVP Progress sidebar moves the row into the active state. For MVP-2+ this is also how the sidebar clears the previous in-progress marker.
 1. Call `start-meeting` with `meetingType: "design"` and an agenda list relevant to that MVP (4-6 items typical).
 2. Select participants dynamically:
    - **Always**: `planner` (mandatory, see above).
@@ -227,9 +241,9 @@ Agent({
 })
 ```
 
-- **PASS (not the last MVP)**: mark MVP done in INDEX.md checklist. **Auto-loop immediately back to Phase 0 (re-enter plan mode) for the next pending MVP, then Phase 2 design meeting.** Skip Phase 1 — kickoff only runs once per session. Do NOT ask the user "계속 진행할까요?" / "MVP-N 진행" / or any variant. Their next checkpoint is the next MVP's `ExitPlanMode` approval. Do NOT touch `.cycle-complete` between MVPs — only after the final MVP.
-- **PASS (last MVP)**: mark MVP done. ONLY NOW, touch `<cwd>/docs/open-coleslaw/.cycle-complete` so the Stop hook can check context usage. Then give a final report and wait for the user.
-- **FAIL**: `EnterPlanMode` again (verify-retry is another planning cycle), `start-meeting({ meetingType: "verify-retry", topic: "<failure summary>" })`, dispatch planner + engineer + verifier for a focused fix discussion, reach consensus, then `ExitPlanMode` with the revised plan. Do NOT touch `.cycle-complete` on failures.
+- **PASS (not the last MVP)**: mark MVP done via `update-mvps({ patch: { id: "<mvp-id>", status: "done" } })` AND update INDEX.md checklist. **Auto-loop immediately back to Phase 0 (re-enter plan mode) for the next pending MVP, then Phase 2 design meeting.** Skip Phase 1 — kickoff only runs once per session. Do NOT ask the user "계속 진행할까요?" / "MVP-N 진행" / or any variant. Their next checkpoint is the next MVP's `ExitPlanMode` approval. Do NOT touch `.cycle-complete` between MVPs — only after the final MVP.
+- **PASS (last MVP)**: mark MVP done via `update-mvps({ patch: { id: "<mvp-id>", status: "done" } })`. ONLY NOW, touch `<cwd>/docs/open-coleslaw/.cycle-complete` so the Stop hook can check context usage. Then give a final report and wait for the user.
+- **FAIL**: mark MVP blocked via `update-mvps({ patch: { id: "<mvp-id>", status: "blocked" } })`. Then `EnterPlanMode` again (verify-retry is another planning cycle), `start-meeting({ meetingType: "verify-retry", topic: "<failure summary>" })`, dispatch planner + engineer + verifier for a focused fix discussion, reach consensus, then `ExitPlanMode` with the revised plan. Do NOT touch `.cycle-complete` on failures. When the retry PASSes, move the MVP back to `done`.
 
 ### Auto-loop contract (strict)
 

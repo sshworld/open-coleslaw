@@ -174,6 +174,20 @@ describe('plugin structure — skills', () => {
     // Must explicitly call out recording-without-reconvene as forbidden
     expect(md.toLowerCase()).toMatch(/recording.*without.*re-engag|recording the rejection/);
   });
+
+  it('using-open-coleslaw skill wires update-mvps at the three required points (v0.6.7)', () => {
+    const md = readFileSync(join(SKILLS, 'using-open-coleslaw', 'SKILL.md'), 'utf-8');
+    // Must mention update-mvps
+    expect(md).toMatch(/update-mvps/);
+    // After kickoff decompose: full list upsert (spans multiple lines)
+    expect(md).toMatch(/update-mvps\(\{[\s\S]*?mvps:\s*\[/);
+    // Per-MVP transition to in-progress (patch form)
+    expect(md).toMatch(/update-mvps\(\{[\s\S]*?status:\s*"in-progress"/);
+    // Per-MVP transition to done (after verifier PASS)
+    expect(md).toMatch(/update-mvps\(\{[\s\S]*?status:\s*"done"/);
+    // blocked on verify FAIL
+    expect(md).toMatch(/update-mvps\(\{[\s\S]*?status:\s*"blocked"/);
+  });
 });
 
 describe('plugin structure — version alignment', () => {

@@ -29,6 +29,8 @@ import {
   addTranscriptHandler,
   generateMinutesSchema,
   generateMinutesHandler,
+  updateMvpsSchema,
+  updateMvpsHandler,
 } from './tools/index.js';
 
 export function createServer(): McpServer {
@@ -154,6 +156,14 @@ export function createServer(): McpServer {
     'Generate PRD minutes from all stored transcripts for a meeting. Marks the meeting as completed.',
     generateMinutesSchema,
     generateMinutesHandler,
+  );
+
+  // 16. update-mvps
+  server.tool(
+    'update-mvps',
+    'Upsert the full per-kickoff MVP list (pass `mvps`) OR patch a single MVP status (pass `patch`). Emits `mvp_progress` so the dashboard sidebar stays in sync. Call after kickoff decompose, when each MVP design meeting starts, and when verifier PASS/FAIL finalises an MVP.',
+    updateMvpsSchema,
+    updateMvpsHandler,
   );
 
   return server;

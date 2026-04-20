@@ -45,7 +45,7 @@ src/
   utils/                -- logger, config, cost tracker
 ```
 
-## MCP Tools (15 registered)
+## MCP Tools (16 registered)
 1. `start-meeting` -- Convene a meeting (`kickoff` | `design` | `verify-retry`) with a topic + agenda
 2. `get-meeting-status` -- Get meeting progress and agent states
 3. `get-minutes` -- Retrieve PRD-format meeting minutes
@@ -61,6 +61,7 @@ src/
 13. `chain-meeting` -- Link meetings: output of one feeds into the next
 14. `add-transcript` -- Record a speaker's turn during a meeting
 15. `generate-minutes` -- Write PRD minutes from the accumulated transcripts
+16. `update-mvps` -- Upsert MVP list (full list or single-MVP status patch); emits `mvp_progress` to the dashboard
 
 ## Agent Tiers
 | Tier | Model | Role |

@@ -157,13 +157,14 @@ See [`CLAUDE.md`](CLAUDE.md) and [`docs/smoke-tests.md`](docs/smoke-tests.md) be
 ---
 
 <details>
-<summary><strong>🛠 15 MCP tools</strong> (the pipeline calls these — you don't)</summary>
+<summary><strong>🛠 16 MCP tools</strong> (the pipeline calls these — you don't)</summary>
 
 | Tool | What it does |
 |------|-------------|
 | `start-meeting` | Creates a meeting record (kickoff / design / verify-retry) |
 | `add-transcript` | Saves a speaker's turn |
 | `generate-minutes` | Writes PRD minutes from transcripts |
+| `update-mvps` | Upserts the MVP list or patches one MVP's status; powers the dashboard sidebar |
 | `get-meeting-status` | Reads meeting progress |
 | `get-minutes` | Retrieves full / summary / tasks-only minutes |
 | `execute-tasks` | Returns the structured task list from minutes for worker dispatch |

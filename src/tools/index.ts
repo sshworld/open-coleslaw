@@ -13,3 +13,4 @@ export { getCostSummarySchema, getCostSummaryHandler } from './get-cost-summary.
 export { chainMeetingSchema, chainMeetingHandler } from './chain-meeting.js';
 export { addTranscriptSchema, addTranscriptHandler } from './add-transcript.js';
 export { generateMinutesSchema, generateMinutesHandler } from './generate-minutes.js';
+export { updateMvpsSchema, updateMvpsHandler } from './update-mvps.js';
