@@ -5,7 +5,7 @@ checklist in a **real Claude Code session**. Paste the release version you are
 checking in the `Version:` field, then mark each item ✅ or ❌.
 
 ```
-Version: 0.6.5
+Version: 0.6.6
 Date: YYYY-MM-DD
 Model active in Claude Code: Opus / Sonnet / Haiku — ________
 ```
@@ -86,6 +86,14 @@ INSIDE plan mode; the synthesised plan surfaces via `ExitPlanMode`.
 - [ ] The verifier runs tests/build after workers finish
 - [ ] **Markdown files in `docs/open-coleslaw/` appear AFTER approve, not during the meeting**
 - [ ] For MVP-2+: Plan Mode re-enters at the start of the next design meeting (no fresh kickoff)
+
+### 5a. Non-default / rejection handling (v0.6.6 regression guard)
+
+- [ ] In `AskUserQuestion`, every question has an **"다른 의견 / Other"** free-text option
+- [ ] If the user picks that "Other" option (or any answer outside the predefined list), the main session **re-dispatches the planner in clarify sub-mode** with the custom answer included — it does NOT skip to decompose
+- [ ] After `ExitPlanMode`, if the user picks a non-approve option (Claude Code plan-mode UI offers reject/feedback), the main session **calls `chain-meeting` and runs a new full design meeting**, NOT just records the feedback as a transcript and stops
+- [ ] If the user's reply is ambiguous / a question / "wait" / "아니" / "다른 방향", the main session treats it as REJECT and re-opens a meeting (default toward safety)
+- [ ] The rejection feedback appears in the new meeting's opening transcript as the highest-weight input
 
 ## 6. Language match
 

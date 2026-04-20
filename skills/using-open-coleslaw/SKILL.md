@@ -79,8 +79,19 @@ into an ordered MVP list, and first asks the user back if anything is fuzzy.
    - Parse the structured questions list.
    - Call `AskUserQuestion({ questions: [...] })` translating each planner
      question into the tool's schema (question + multiSelect:false + options).
+     **Always include a final "다른 의견 / Other" open-text option** for every
+     question so the user can override your predefined choices.
    - Wait for the user's answers.
    - `add-transcript` the user's answers with `speakerRole: "user", agendaItemIndex: 0, roundNumber: 1, stance: "speaking"`.
+   - **Non-default / custom answer handling (MANDATORY)**: if ANY answer was
+     the "Other" free-text option OR the user's reply diverges from your
+     predefined options in content, treat it as **new constraints** — you MUST
+     re-dispatch the planner in clarify sub-mode again with the custom answer
+     included in the prompt, not skip directly to decompose. Only when all
+     answers are within-options AND the planner then returns `READY` do you
+     proceed to step 4. Recording the transcript without re-engaging the
+     planner is a silent failure — **the user's feedback must trigger another
+     planner turn**.
 
    **If the planner returned `READY`:** skip straight to step 4.
 
@@ -161,9 +172,34 @@ decisions, rationale, and action items. Now surface them as the plan.
    - Ordered tasks (one per worker)
    - Acceptance / verification
 2. Call `ExitPlanMode({ plan: <plan string> })`.
-3. **Rejected**: you are back in plan mode. `chain-meeting` to a focused
-   design or verify-retry meeting based on the user's feedback and loop back
-   to Phase 2. Do NOT exit plan mode again until the new consensus is reached.
+3. **Rejection detection (MANDATORY — do not skip)**: After `ExitPlanMode`,
+   check what the user returned. The plan is ONLY approved when the user's
+   response is an unambiguous approval (e.g., "approve", "yes", "go ahead",
+   "진행해", empty + continue, or Claude Code's native "plan approved" signal).
+   Any of the following means REJECTED and triggers step 3 below:
+   - User picked a non-approval option from Claude Code's plan-mode UI
+   - User replied with "no" / "stop" / "wait" / "아니" / "다른 방향" / any
+     redirect, pushback, alternative suggestion, or new constraint
+   - User supplied a "다른 의견 / Other" free-text answer describing a
+     different approach
+   - User asked a question that implies the plan is wrong ("왜 X 안 했어?",
+     "이건 Y 해야 하지 않나?")
+
+   When rejected: `add-transcript` the user's feedback with
+   `speakerRole: "user", stance: "disagree"`, then follow step 3.
+3a. **Rejected — you MUST re-open a meeting, not just record feedback**:
+   - You are still in plan mode. Do NOT call `ExitPlanMode` again with the
+     same plan.
+   - Call `chain-meeting({ fromMeetingId: <current>, newTopic: "<rejection summary>", meetingType: "design" | "verify-retry" })`.
+   - Return to Phase 2 step 2 (select participants), running a **full new
+     design round** with the user's feedback pre-seeded in the opening
+     transcript as the highest-weight input.
+   - Only after the new consensus is reached and a revised plan is
+     synthesised do you call `ExitPlanMode` again.
+   - **Silent failure mode (forbidden)**: recording the user's feedback via
+     `add-transcript` and then doing nothing — or trying to patch the plan
+     yourself without re-convening specialists — is a regression. The user
+     pushed back; the pipeline owes them another meeting.
 4. **Approved** — you are now out of plan mode. IMMEDIATELY perform the
    deferred disk writes:
    - Write kickoff markdown to `<cwd>/docs/open-coleslaw/YYYY-MM-DD_kickoff_<slug>.md`
@@ -229,6 +265,9 @@ User turns are the highest-weight voice — update proposals immediately.
 | "I'll write minutes markdown mid-meeting to not lose it" | FORBIDDEN. You are in plan mode — disk writes are blocked. Keep minutes in SQLite via `generate-minutes`, flush to markdown AFTER `ExitPlanMode` approval. |
 | "I'll skip EnterPlanMode because the request looks simple" | FORBIDDEN. Every planning cycle starts with `EnterPlanMode` before the first planner dispatch. The user's "approve" gate is `ExitPlanMode`. |
 | "User gave clear requirements, no clarify needed" | Maybe — but still dispatch planner in `kickoff/clarify` mode first. If planner returns `READY`, you skip `AskUserQuestion` and proceed to decompose. Never bypass the clarify step. |
+| "User picked the 'Other' / 4th option so I'll just record it and move on" | FORBIDDEN. Any non-default, custom, or out-of-options answer is **new constraints**. Re-dispatch planner in clarify sub-mode with the custom answer included — do not skip to decompose. |
+| "User rejected the plan but I already captured their feedback as a transcript" | FORBIDDEN. Recording the rejection is step one. Step two is `chain-meeting` and running a **new full design meeting** with that feedback pre-seeded. Do not patch the plan yourself and re-`ExitPlanMode`. |
+| "User said something ambiguous after ExitPlanMode, I'll assume approve" | FORBIDDEN. Only treat as approve if the reply is an unambiguous yes. Any pushback / question / alternative / "wait" / "아니" / "다른 방향" = REJECT → re-open meeting. When in doubt, re-open. |
 | "User asked in Korean so I'll reply in English" | Match the user's language in every transcript and minute. |
 
 ## Dashboard

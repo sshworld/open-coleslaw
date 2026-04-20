@@ -162,6 +162,18 @@ describe('plugin structure — skills', () => {
     expect(md).toMatch(/4 questions/i);
     expect(md).toMatch(/options/);
   });
+
+  it('using-open-coleslaw skill forbids silent-reject (v0.6.6)', () => {
+    const md = readFileSync(join(SKILLS, 'using-open-coleslaw', 'SKILL.md'), 'utf-8');
+    // Clarify step: non-default answers must trigger another planner dispatch
+    expect(md.toLowerCase()).toMatch(/other.*free.text|다른 의견|free[- ]text option/);
+    expect(md.toLowerCase()).toMatch(/re-dispatch the planner|trigger another planner/);
+    // ExitPlanMode rejection: must re-open a full meeting, not just patch the plan
+    expect(md).toMatch(/chain-meeting/);
+    expect(md.toLowerCase()).toMatch(/silent failure|silent-reject|regression/);
+    // Must explicitly call out recording-without-reconvene as forbidden
+    expect(md.toLowerCase()).toMatch(/recording.*without.*re-engag|recording the rejection/);
+  });
 });
 
 describe('plugin structure — version alignment', () => {
