@@ -5,7 +5,7 @@ checklist in a **real Claude Code session**. Paste the release version you are
 checking in the `Version:` field, then mark each item ✅ or ❌.
 
 ```
-Version: 0.6.x
+Version: 0.6.5
 Date: YYYY-MM-DD
 Model active in Claude Code: Opus / Sonnet / Haiku — ________
 ```
@@ -71,14 +71,21 @@ OR after completion:
       action items (comments/dialog are NOT rehydrated — that's expected;
       the file is the source of truth)
 
-## 5. Plan Mode enters from the main session
+## 5. Plan Mode wraps the whole planning cycle (v0.6.5)
 
-After the design meeting reaches consensus:
+New in v0.6.5: plan mode is ENTERED before the first planner dispatch, not
+after the meeting. The entire clarify + kickoff + design meeting happens
+INSIDE plan mode; the synthesised plan surfaces via `ExitPlanMode`.
 
-- [ ] Plan Mode activates in the main session (native UI, not a plain-text plan)
-- [ ] The plan references files, tasks, and acceptance criteria from the minutes
+- [ ] Plan Mode indicator (native UI) appears **before** the first `Agent(open-coleslaw:planner ...)` dispatch
+- [ ] If requirements are fuzzy: `AskUserQuestion` prompt appears with 2-5 options per question (≤4 questions total)
+- [ ] After user answers, planner is re-dispatched in decompose mode with the answers
+- [ ] Design meeting (architect / engineer / verifier + consensus checks) proceeds while Plan Mode stays active
+- [ ] At synthesis, main session calls `ExitPlanMode({ plan })` — the native plan UI appears with files + tasks + acceptance
 - [ ] Approving the plan dispatches `Agent(open-coleslaw:worker ...)` calls in parallel
 - [ ] The verifier runs tests/build after workers finish
+- [ ] **Markdown files in `docs/open-coleslaw/` appear AFTER approve, not during the meeting**
+- [ ] For MVP-2+: Plan Mode re-enters at the start of the next design meeting (no fresh kickoff)
 
 ## 6. Language match
 

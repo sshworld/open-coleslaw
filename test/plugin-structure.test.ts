@@ -136,6 +136,32 @@ describe('plugin structure — skills', () => {
     expect(md.toLowerCase()).toMatch(/planner is mandatory|mandatory.*planner|planner.*mandatory/);
     expect(md).toMatch(/every MVP/i);
   });
+
+  it('using-open-coleslaw skill wraps the meeting in plan mode (v0.6.5)', () => {
+    const md = readFileSync(join(SKILLS, 'using-open-coleslaw', 'SKILL.md'), 'utf-8');
+    // Enter plan mode BEFORE first planner dispatch
+    expect(md).toMatch(/EnterPlanMode\(\)/);
+    // Exit plan mode at synthesis boundary
+    expect(md).toMatch(/ExitPlanMode\(\{\s*plan/);
+    // AskUserQuestion is used for the clarify step
+    expect(md).toMatch(/AskUserQuestion/);
+    // Clarify / decompose sub-modes must be referenced
+    expect(md).toMatch(/kickoff\/clarify/);
+    expect(md).toMatch(/kickoff\/decompose/);
+    // Disk writes must be explicitly deferred until after approve
+    expect(md.toLowerCase()).toMatch(/do not\*{0,2}\s+write[^\n]*markdown/);
+  });
+
+  it('planner agent defines the clarify/decompose output contract (v0.6.5)', () => {
+    const md = readFileSync(join(AGENTS, 'planner.md'), 'utf-8');
+    expect(md).toMatch(/Sub-mode A:\s*`?clarify`?/i);
+    expect(md).toMatch(/Sub-mode B:\s*`?decompose`?/i);
+    expect(md).toMatch(/NEEDS_CLARIFICATION/);
+    expect(md).toMatch(/\bREADY\b/);
+    // Questions cap (4) and structured options
+    expect(md).toMatch(/4 questions/i);
+    expect(md).toMatch(/options/);
+  });
 });
 
 describe('plugin structure — version alignment', () => {

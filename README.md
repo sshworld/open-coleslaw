@@ -76,30 +76,35 @@ Planner is mandatory. The other specialists are convened dynamically based on wh
 ## The Pipeline
 
 ```
-                  You type a prompt
-                         │
-                         ▼
-              ┌──────────────────────┐
-              │   Main Claude        │
-              │   session (you)      │
-              └──────────┬───────────┘
-                         │ dispatches
-           ┌─────────────┼─────────────────────┐
-           ▼             ▼                     ▼
-     ┌─────────┐   Design meeting        Plan Mode → approve
-     │ Kickoff │   planner → architect          │
-     │ planner │   → engineer → verifier        │
-     │ → MVPs  │   (consensus check            parallel
-     └─────────┘   every round)             workers
-                         │                     │
-                         └─────────┬───────────┘
-                                   ▼
-                              verifier
-                            /          \
-                          pass         fail
-                           │             │
-                      next MVP     verify-retry meeting
+You type a prompt
+       │
+       ▼
+[EnterPlanMode]                     ← planning cycle begins
+       │
+  ┌────┴──── Phase 1: Clarify + Kickoff ────┐
+  │  planner (clarify) → AskUserQuestion?   │
+  │  planner (decompose) → MVP list         │
+  └────┬────────────────────────────────────┘
+       │
+  ┌────┴──── Phase 2: Design meeting (per MVP) ──┐
+  │  planner → architect → engineer → verifier   │
+  │  consensus check each round                  │
+  │  planner synthesises minutes                 │
+  └────┬────────────────────────────────────────┘
+       │
+[ExitPlanMode({ plan })]            ← user approves
+       │
+  approve ─► write minutes markdown + INDEX.md
+       │
+  Phase 4: workers (parallel) ─► Phase 5: verifier
+       │
+   pass → next MVP (re-enter plan mode)
+   fail → verify-retry meeting (plan mode again)
 ```
+
+The whole **planning cycle** — from the first planner dispatch through the
+synthesised plan — runs inside Claude Code's native plan mode. Implementation
+and verification happen outside plan mode. Each MVP is its own cycle.
 
 When all MVPs pass verification, the main session touches a marker file and the Stop hook checks your context usage — if you're over ~30%, it suggests running `/compact` or `/clear`. Minutes on disk mean you lose nothing.
 

@@ -29,35 +29,82 @@ Previously we used an `orchestrator` subagent to run meetings. That turned into 
 
 Yes, this fills your context with meeting transcripts. That's fine — the Stop hook suggests `/compact` or `/clear` when you finish a cycle. Minutes persist on disk.
 
-## Phase 1 — Kickoff Meeting
+## Phase 0 — Enter Plan Mode
 
-Break the user's request into ordered MVPs.
+The meeting IS the planning. The moment you are about to dispatch the **first
+planner** (kickoff or per-MVP design), you are entering planning. Therefore:
+
+1. Call `EnterPlanMode()` **before** the first planner dispatch of the current
+   planning cycle.
+2. Stay in plan mode through Phase 1 (Clarify + Kickoff) and Phase 2 (Design).
+3. Exit plan mode only at Phase 3 via `ExitPlanMode({ plan })`.
+
+Why plan mode for the whole meeting:
+- MCP tools (`start-meeting`, `add-transcript`, `generate-minutes`) work in plan mode.
+- `Agent(...)` dispatches work in plan mode.
+- `AskUserQuestion(...)` works in plan mode (needed for Phase 1 clarify).
+- Disk writes (minutes markdown, INDEX.md, `.pending-comments.consumed.jsonl`)
+  DO NOT work in plan mode. Defer those until `ExitPlanMode` + user approval.
+
+## Phase 1 — Clarify + Kickoff
+
+This phase runs ONCE per user request (not per MVP). It breaks the request
+into an ordered MVP list, and first asks the user back if anything is fuzzy.
 
 1. Detect the user's language from the prompt. Use that language throughout.
 2. Call MCP tool `start-meeting`:
    ```
    start-meeting({
      topic: "<one-line summary of the request in user's language>",
-     agenda: ["Decompose the request into ordered MVPs"],
+     agenda: ["Understand user's needs", "Decompose the request into ordered MVPs"],
      meetingType: "kickoff"
    })
    ```
    Capture the returned `meetingId`.
-3. Dispatch the planner:
+3. **Clarify step** — dispatch the planner in clarify sub-mode:
    ```
    Agent({
      subagent_type: "open-coleslaw:planner",
-     prompt: `Mode: kickoff. Language: <user's language>.
+     prompt: `Mode: kickoff/clarify. Language: <user's language>.
      User request: <full verbatim request>
      Project context: cwd=<cwd>, stack=<stack notes>.
-     Produce an ordered MVP list per the planner prompt's kickoff output format.`
+     Follow your planner prompt's "Sub-mode A: clarify" contract exactly.
+     Return EITHER a NEEDS_CLARIFICATION block with structured questions,
+     OR the literal token "READY".`
    })
    ```
-4. Take the planner's response, call `add-transcript({ meetingId, speakerRole: "planner", agendaItemIndex: 0, roundNumber: 1, content: <planner output>, stance: "speaking" })`.
-5. If requirements are fuzzy, also dispatch `open-coleslaw:product-manager` for clarification, then `add-transcript`.
-6. Call `generate-minutes({ meetingId })`.
-7. Save the minutes markdown to `<cwd>/docs/open-coleslaw/YYYY-MM-DD_kickoff_<slug>.md`. Update (or create) `<cwd>/docs/open-coleslaw/INDEX.md` with the MVP checklist.
-8. Briefly confirm the MVP list with the user in ≤3 lines (e.g., "MVP-1 Core Play / MVP-2 Categories / MVP-3 Share — starting with MVP-1").
+   `add-transcript` the response with `speakerRole: "planner", agendaItemIndex: 0, roundNumber: 1, stance: "speaking"`.
+
+   **If the planner returned `NEEDS_CLARIFICATION`:**
+   - Parse the structured questions list.
+   - Call `AskUserQuestion({ questions: [...] })` translating each planner
+     question into the tool's schema (question + multiSelect:false + options).
+   - Wait for the user's answers.
+   - `add-transcript` the user's answers with `speakerRole: "user", agendaItemIndex: 0, roundNumber: 1, stance: "speaking"`.
+
+   **If the planner returned `READY`:** skip straight to step 4.
+
+4. **Decompose step** — re-dispatch the planner in decompose sub-mode with any
+   clarifications appended:
+   ```
+   Agent({
+     subagent_type: "open-coleslaw:planner",
+     prompt: `Mode: kickoff/decompose. Language: <user's language>.
+     User request: <full verbatim request>
+     User clarifications: <answers from AskUserQuestion, or "none needed">
+     Project context: cwd=<cwd>, stack=<stack notes>.
+     Produce an ordered MVP list per the planner prompt's decompose format.`
+   })
+   ```
+   `add-transcript` the response with `agendaItemIndex: 1, roundNumber: 1, stance: "speaking"`.
+
+5. (Optional) if requirements are still fuzzy after clarify, dispatch
+   `open-coleslaw:product-manager`, `add-transcript` their input, then
+   re-dispatch planner once more for refinement.
+6. Call `generate-minutes({ meetingId })` to write the kickoff record to SQLite.
+7. **DO NOT** write the kickoff markdown file yet. You are still in plan mode
+   — disk writes happen after Phase 3 approval.
+8. Hold the MVP list in working memory. Move straight to Phase 2 for MVP-1.
 
 ## Phase 2 — Design Meeting (per MVP)
 
@@ -101,19 +148,30 @@ For the current MVP:
    d. If `r == MAX_ROUNDS` and still no consensus → call the `respond-to-mention` MCP tool (or similar) to escalate to the user. Wait for decision.
 5. **Synthesis (MANDATORY)**: dispatch `open-coleslaw:planner` in synthesis mode to produce the final minutes.
 6. `add-transcript` the synthesis output with `agendaItemIndex: -2, stance: "speaking"`, then `generate-minutes`.
-7. Save the minutes to `<cwd>/docs/open-coleslaw/YYYY-MM-DD_<seq>_<mvp-slug>.md`. Update `INDEX.md`.
+7. **DO NOT** write the design minutes markdown yet. Still in plan mode — disk writes happen after Phase 3 approval.
 
-## Phase 3 — Plan Mode
+## Phase 3 — Exit Plan Mode (present plan for approval)
 
-1. `EnterPlanMode`.
-2. Write a plan derived from the minutes' Decisions / Action Items / Acceptance Criteria:
+You are still in plan mode from Phase 0. The design meeting produced concrete
+decisions, rationale, and action items. Now surface them as the plan.
+
+1. Build the plan string from the design minutes:
    - Context (why, in user's language)
    - Files to create/modify
    - Ordered tasks (one per worker)
    - Acceptance / verification
-3. `ExitPlanMode` to present for user approval.
-4. **Rejected**: `chain-meeting` back to a focused design or verify-retry meeting based on feedback. Re-enter Phase 2.
-5. **Approved**: go to Phase 4.
+2. Call `ExitPlanMode({ plan: <plan string> })`.
+3. **Rejected**: you are back in plan mode. `chain-meeting` to a focused
+   design or verify-retry meeting based on the user's feedback and loop back
+   to Phase 2. Do NOT exit plan mode again until the new consensus is reached.
+4. **Approved** — you are now out of plan mode. IMMEDIATELY perform the
+   deferred disk writes:
+   - Write kickoff markdown to `<cwd>/docs/open-coleslaw/YYYY-MM-DD_kickoff_<slug>.md`
+     (only if this is the first MVP of the session).
+   - Write design markdown to `<cwd>/docs/open-coleslaw/YYYY-MM-DD_<seq>_<mvp-slug>.md`.
+   - Create/update `<cwd>/docs/open-coleslaw/INDEX.md` with the MVP checklist.
+   - Consume any queued `.pending-comments.jsonl` entries you saw during the meeting.
+5. Go to Phase 4.
 
 ## Phase 4 — Implementation
 
@@ -133,9 +191,9 @@ Agent({
 })
 ```
 
-- **PASS (not the last MVP)**: mark MVP done in INDEX.md checklist. **Auto-loop immediately back to Phase 2 with the next pending MVP. Do NOT ask the user "계속 진행할까요?" / "MVP-N 진행" / or any variant.** The user already approved the overall plan at kickoff; their next checkpoint is the NEXT MVP's Plan Mode. Do NOT touch `.cycle-complete` between MVPs — only after the final MVP.
+- **PASS (not the last MVP)**: mark MVP done in INDEX.md checklist. **Auto-loop immediately back to Phase 0 (re-enter plan mode) for the next pending MVP, then Phase 2 design meeting.** Skip Phase 1 — kickoff only runs once per session. Do NOT ask the user "계속 진행할까요?" / "MVP-N 진행" / or any variant. Their next checkpoint is the next MVP's `ExitPlanMode` approval. Do NOT touch `.cycle-complete` between MVPs — only after the final MVP.
 - **PASS (last MVP)**: mark MVP done. ONLY NOW, touch `<cwd>/docs/open-coleslaw/.cycle-complete` so the Stop hook can check context usage. Then give a final report and wait for the user.
-- **FAIL**: `start-meeting({ meetingType: "verify-retry", topic: "<failure summary>" })`, dispatch planner + engineer + verifier for a focused fix discussion, reach consensus, return to Phase 3 with the revised plan. Do NOT touch `.cycle-complete` on failures.
+- **FAIL**: `EnterPlanMode` again (verify-retry is another planning cycle), `start-meeting({ meetingType: "verify-retry", topic: "<failure summary>" })`, dispatch planner + engineer + verifier for a focused fix discussion, reach consensus, then `ExitPlanMode` with the revised plan. Do NOT touch `.cycle-complete` on failures.
 
 ### Auto-loop contract (strict)
 
@@ -168,6 +226,9 @@ User turns are the highest-weight voice — update proposals immediately.
 | "The user said 'do MVP 2-5', I'll skip meetings and just implement" | FORBIDDEN. Every MVP needs its own full design meeting (planner + specialists + consensus + minutes) before Plan Mode. Kickoff only gave titles, not design decisions. |
 | "Planner is just a chair, I can summarize the meeting myself" | FORBIDDEN. Every meeting MUST include `Agent(open-coleslaw:planner ...)` dispatches at opening, each consensus check, and synthesis. If a meeting closes with zero planner dispatches, it is invalid — restart it. |
 | "Skip the kickoff for one-file change" | Always run kickoff. MVP list may have just one item. |
+| "I'll write minutes markdown mid-meeting to not lose it" | FORBIDDEN. You are in plan mode — disk writes are blocked. Keep minutes in SQLite via `generate-minutes`, flush to markdown AFTER `ExitPlanMode` approval. |
+| "I'll skip EnterPlanMode because the request looks simple" | FORBIDDEN. Every planning cycle starts with `EnterPlanMode` before the first planner dispatch. The user's "approve" gate is `ExitPlanMode`. |
+| "User gave clear requirements, no clarify needed" | Maybe — but still dispatch planner in `kickoff/clarify` mode first. If planner returns `READY`, you skip `AskUserQuestion` and proceed to decompose. Never bypass the clarify step. |
 | "User asked in Korean so I'll reply in English" | Match the user's language in every transcript and minute. |
 
 ## Dashboard
