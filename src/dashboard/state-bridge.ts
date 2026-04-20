@@ -91,11 +91,14 @@ export class StateBridge extends EventEmitter {
     // Rehydrate past meetings from the on-disk minutes directory so the
     // sidebar survives MCP server restarts. Fire-and-forget: we broadcast
     // the rehydrated snapshot once it's ready instead of blocking register.
+    // Skip if already hydrated (prevents two concurrent register calls from
+    // clobbering each other's results).
     hydratePastMeetings(info.projectPath)
       .then((past) => {
         if (past.length === 0) return;
         const current = this.projects.get(info.projectPath);
         if (!current) return;
+        if (current.pastMeetings.length > 0) return; // already hydrated
         current.pastMeetings = past;
         logger.info(
           `Hydrated ${past.length} past meeting(s) for ${displayName}`,

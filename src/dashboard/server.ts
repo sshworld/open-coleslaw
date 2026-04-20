@@ -139,8 +139,10 @@ export function startDashboard(options: DashboardOptions): Promise<DashboardHand
             } else if ((msg as { type?: string }).type === 'ping') {
               ws.send(JSON.stringify({ type: 'pong' }));
             }
-          } catch {
-            // ignore malformed
+          } catch (err: unknown) {
+            logger.debug(
+              `Malformed WebSocket message: ${err instanceof Error ? err.message : String(err)}`,
+            );
           }
         });
       });

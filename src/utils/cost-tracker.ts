@@ -1,4 +1,5 @@
 import { getDb } from '../storage/db.js';
+import { logger } from './logger.js';
 
 // ---------------------------------------------------------------------------
 // Cost summary
@@ -122,8 +123,11 @@ export class CostTracker {
           byDepartment[leader.department] = (byDepartment[leader.department] ?? 0) + cost;
         }
       }
-    } catch {
-      // DB might not be initialised yet; fall through to in-memory only
+    } catch (err: unknown) {
+      // DB might not be initialised yet; fall through to in-memory only.
+      logger.debug(
+        `Cost tracker: DB aggregation skipped (${err instanceof Error ? err.message : String(err)})`,
+      );
     }
 
     // 3. Aggregate in-memory entries

@@ -3,6 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { createServer } from './server.js';
 import { ensureDataDirs } from './utils/config.js';
 import { startDashboard } from './dashboard/server.js';
+import { logger } from './utils/logger.js';
 
 async function main() {
   ensureDataDirs();
@@ -14,7 +15,11 @@ async function main() {
     const sessionId = randomUUID();
     const projectPath = process.cwd();
     const projectName = projectPath.split('/').pop() ?? 'unknown';
-    startDashboard({ sessionId, projectPath, projectName }).catch(() => {});
+    startDashboard({ sessionId, projectPath, projectName }).catch((err: unknown) => {
+      logger.warn(
+        `Dashboard startup failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    });
   }
 
   const server = createServer();
@@ -22,7 +27,10 @@ async function main() {
   await server.connect(transport);
 }
 
-main().catch((error) => {
-  console.error('Fatal error:', error);
+main().catch((error: unknown) => {
+  // stderr, not stdout — stdout is the MCP JSON-RPC channel.
+  logger.error(
+    `Fatal error: ${error instanceof Error ? error.message : String(error)}`,
+  );
   process.exit(1);
 });
